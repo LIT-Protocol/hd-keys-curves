@@ -1,0 +1,11 @@
+[package]
+name = "hd-keys-ecdsa"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cait-sith = { git = "https://github.com/LIT-Protocol/cait-sith.git", features = ["k256"] }
+k256 = { version = "0.13", features = ["ecdsa-core", "hash2curve", "sha256"] }
+p256 = { version = "0.13", features = ["ecdsa-core", "hash2curve", "sha256"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
