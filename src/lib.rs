@@ -198,7 +198,7 @@ impl<C: CurveArithmetic> HdKeyDeriver<C> {
     }
 
     pub fn compute_secret_key(&self, shares: &[C::Scalar]) -> C::Scalar {
-        let mut result = C::Scalar::ONE;
+        let mut result = C::Scalar::ZERO;
 
         // Compute the polynomial value using Horner's Method
         for share in shares.iter().rev() {
