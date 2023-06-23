@@ -2,6 +2,7 @@ mod error;
 
 pub use error::*;
 
+use byteorder::{BigEndian, ReadBytesExt};
 use cait_sith::{CSCurve, KeygenOutput};
 use std::{
     convert::Infallible,
@@ -208,13 +209,13 @@ impl<C: CurveArithmetic> HdKeyDeriver<C> {
         result
     }
 
-    pub fn compute_public_key(&self, public_keys: &[C::AffinePoint]) -> C::AffinePoint {
+    pub fn compute_public_key(&self, public_keys: &[C::ProjectivePoint]) -> C::ProjectivePoint {
         let mut powers = vec![<C::Scalar as Field>::ONE; public_keys.len()];
         powers[1] = self.0;
         for i in 2..powers.len() {
             powers[i] = powers[i - 1] * self.0;
         }
-        sum_of_products_pippenger::<C>(public_keys, &powers)
+        sum_of_products_pippenger::<C>(&public_keys, &powers)
     }
 
     pub fn to_bytes(&self) -> [u8; 32] {
@@ -241,64 +242,200 @@ impl<C: CurveArithmetic> HdKeyDeriver<C> {
 }
 
 fn sum_of_products_pippenger<C: CurveArithmetic>(
-    points: &[C::AffinePoint],
+    points: &[C::ProjectivePoint],
     scalars: &[C::Scalar],
-) -> C::AffinePoint {
-    const UPPER: usize = 256;
-    const W: usize = 4;
-    const WINDOWS: usize = UPPER / W; // careful--use ceiling division in case this doesn't divide evenly
-    const BUCKET_SIZE: usize = 1 << W;
+) -> C::ProjectivePoint {
+    const WINDOW: usize = 4;
+    const NUM_BUCKETS: usize = 1 << WINDOW;
+    const EDGE: usize = WINDOW - 1;
+    const MASK: u64 = (NUM_BUCKETS - 1) as u64;
 
-    if points.len() != scalars.len() {
-        panic!("points and scalars must have the same length");
+    let scalars = scalars.iter().map(|s| {
+        let repr = s.to_repr();
+        let mut out = [0u64; 4];
+        let mut cursor = std::io::Cursor::new(repr.as_ref());
+        out[3] = cursor.read_u64::<BigEndian>().unwrap();
+        out[2] = cursor.read_u64::<BigEndian>().unwrap();
+        out[1] = cursor.read_u64::<BigEndian>().unwrap();
+        out[0] = cursor.read_u64::<BigEndian>().unwrap();
+        out
+    }).collect::<Vec<_>>();
+    let num_components = std::cmp::min(points.len(), scalars.len());
+    let mut buckets = [<C::ProjectivePoint as Group>::identity(); NUM_BUCKETS];
+    let mut res = C::ProjectivePoint::identity();
+    let mut num_doubles = 0;
+    let mut bit_sequence_index = 255usize;
+
+    loop {
+        for _ in 0..num_doubles {
+            res = res.double();
+        }
+
+        let mut max_bucket = 0;
+        let word_index = bit_sequence_index >> 6;
+        let bit_index = bit_sequence_index & 63;
+
+        if bit_index < EDGE {
+            // we are on the edge of a word; have to look at the previous word, if it exists
+            if word_index == 0 {
+                // there is no word before
+                let smaller_mask = ((1 << (bit_index + 1)) - 1) as u64;
+                for i in 0..num_components {
+                    let bucket_index: usize =
+                        (scalars[i][word_index] & smaller_mask) as usize;
+                    if bucket_index > 0 {
+                        buckets[bucket_index] += points[i];
+                        if bucket_index > max_bucket {
+                            max_bucket = bucket_index;
+                        }
+                    }
+                }
+            }
+            else {
+                // there is a word before
+                let high_order_mask = ((1 << (bit_index + 1)) - 1) as u64;
+                let high_order_shift = EDGE - bit_index;
+                let low_order_mask = ((1 << high_order_shift) - 1) as u64;
+                let low_order_shift = 64 - high_order_shift;
+                let prev_word_index = word_index - 1;
+                for i in 0..num_components {
+                    let mut bucket_index = ((scalars[i][word_index] & high_order_mask)
+                        << high_order_shift)
+                        as usize;
+                    bucket_index |= ((scalars[i][prev_word_index] >> low_order_shift)
+                        & low_order_mask) as usize;
+                    if bucket_index > 0 {
+                        buckets[bucket_index] += points[i];
+                        if bucket_index > max_bucket {
+                            max_bucket = bucket_index;
+                        }
+                    }
+                }
+            }
+        } else {
+            let shift = bit_index - EDGE;
+            for i in 0..num_components {
+                let bucket_index: usize =
+                    ((scalars[i][word_index] >> shift) & MASK) as usize;
+                if bucket_index > 0 {
+                    buckets[bucket_index] += points[i];
+                    if bucket_index > max_bucket {
+                        max_bucket = bucket_index;
+                    }
+                }
+            }
+        }
+        res += &buckets[max_bucket];
+        for i in (1..max_bucket).rev() {
+            buckets[i] += buckets[i + 1];
+            res += buckets[i];
+            buckets[i + 1] = C::ProjectivePoint::identity();
+        }
+        buckets[1] = C::ProjectivePoint::identity();
+        if bit_sequence_index < WINDOW {
+            break;
+        }
+        bit_sequence_index -= WINDOW;
+        num_doubles = {
+            if bit_sequence_index < EDGE {
+                bit_sequence_index + 1
+            } else {
+                WINDOW
+            }
+        };
     }
+    res
+}
 
-    let mut windows = vec![<C::ProjectivePoint as Group>::identity(); WINDOWS];
-    let mut bytes = vec![[0u8; 32]; scalars.len()];
-    let mut buckets = vec![<C::ProjectivePoint as Group>::identity(); BUCKET_SIZE];
+#[test]
+fn pippinger_k256_known() {
+    let points = [k256::ProjectivePoint::GENERATOR; 3];
+    let scalars = [
+        k256::Scalar::from(1u64),
+        k256::Scalar::from(2u64),
+        k256::Scalar::from(3u64),
+    ];
+    let expected = points[0]*scalars[0] + points[1]*scalars[1] + points[2]*scalars[2];
 
-    for i in 0..scalars.len() {
-        let mut repr = [0u8; 32];
-        repr.copy_from_slice(<C::Scalar as PrimeField>::to_repr(&scalars[i]).as_ref());
-        bytes[i] = repr;
+    let actual = sum_of_products_pippenger::<k256::Secp256k1>(&points, &scalars);
+
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn pippinger_schnorr_proof() {
+    let mut rng = rand::thread_rng();
+
+    for _ in 0..25 {
+        let h0 = k256::ProjectivePoint::random(&mut rng);
+        let s = k256::Scalar::random(&mut rng);
+        let s_tilde = k256::Scalar::random(&mut rng);
+        let c = k256::Scalar::random(&mut rng);
+
+        assert_eq!(
+            h0 * s,
+            sum_of_products_pippenger::<k256::Secp256k1>(&[h0], &[s])
+        );
+
+        assert_eq!(
+            h0 * s_tilde,
+            sum_of_products_pippenger::<k256::Secp256k1>(&[h0], &[s_tilde])
+        );
+
+        let u = h0 * s;
+        let u_tilde = h0 * s_tilde;
+        let s_hat = s_tilde - c * s;
+        assert_eq!(u_tilde, u * c + h0 * s_hat);
+        assert_eq!(
+            u_tilde,
+            sum_of_products_pippenger::<k256::Secp256k1>(&[u, h0], &[c, s_hat])
+        )
     }
-    let points = points
+}
+
+#[test]
+fn pippinger_p256_known() {
+    let points = [p256::ProjectivePoint::generator(); 3];
+    let scalars = [
+        p256::Scalar::from(1u64),
+        p256::Scalar::from(2u64),
+        p256::Scalar::from(3u64),
+    ];
+    let expected = points[0]*scalars[0] + points[1]*scalars[1] + points[2]*scalars[2];
+
+    let actual = sum_of_products_pippenger::<p256::NistP256>(&points, &scalars);
+
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn compute_secret_key() {
+    let mut rng = rand::thread_rng();
+    let d0 = k256::Scalar::random(&mut rng);
+    let d1 = k256::Scalar::random(&mut rng);
+
+    let d0_shares = vsss_rs::shamir::split_secret::<k256::Scalar, u8, Vec<u8>>(2, 3, d0, &mut rng)
+        .unwrap()
         .iter()
-        .map(|p| C::ProjectivePoint::from(*p))
+        .map(|s| <Vec<u8> as vsss_rs::Share>::as_field_element::<k256::Scalar>(s).unwrap())
+        .collect::<Vec<_>>();
+    let d1_shares = vsss_rs::shamir::split_secret::<k256::Scalar, u8, Vec<u8>>(2, 3, d1, &mut rng)
+        .unwrap()
+        .iter()
+        .map(|s| <Vec<u8> as vsss_rs::Share>::as_field_element::<k256::Scalar>(s).unwrap())
         .collect::<Vec<_>>();
 
-    let mut sum;
+    let deriver = HdKeyDeriverType::K256.create_deriver::<k256::Secp256k1>(b"id", b"LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_").unwrap();
+    let p0 = deriver.compute_secret_key(&[d0_shares[0], d1_shares[0]]);
+    let p1 = deriver.compute_secret_key(&[d0_shares[1], d1_shares[1]]);
+    // let p2 = deriver.compute_secret_key(&[d0_shares[2], d1_shares[2]]);
 
-    for (j, window) in windows.iter_mut().enumerate() {
-        for bucket in buckets.iter_mut() {
-            *bucket = <C::ProjectivePoint as Group>::identity();
-        }
+    let shares = [p0, p1]
+        .iter()
+        .enumerate()
+        .map(|(i, p)| <Vec<u8> as vsss_rs::Share>::from_field_element((i + 1) as u8, *p).unwrap())
+        .collect::<Vec<_>>();
+    let p = vsss_rs::combine_shares::<k256::Scalar, u8, Vec<u8>>(&shares).unwrap();
 
-        for i in 0..scalars.len() {
-            // j*W to get the nibble
-            // >> 3 to convert to byte, / 8
-            // (W * j & W) gets the nibble, mod W
-            // 1 << W - 1 to get the offset
-            let index = bytes[i][(j * W) >> 3] >> ((W * j) & W) & ((1 << W) - 1); // little-endian
-            buckets[index as usize] += points[i];
-        }
-
-        sum = C::ProjectivePoint::identity();
-
-        for i in (0..BUCKET_SIZE - 1).rev() {
-            sum += buckets[i];
-            *window += sum;
-        }
-    }
-
-    sum = C::ProjectivePoint::identity();
-    for i in (0..WINDOWS).rev() {
-        for _ in 0..W {
-            sum = sum.double();
-        }
-
-        sum += windows[i];
-    }
-
-    sum.to_affine()
+    assert_eq!(p, d0 + d1 * deriver.to_inner());
 }

@@ -4,8 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+byteorder = "1.4"
 cait-sith = { git = "https://github.com/LIT-Protocol/cait-sith.git", features = ["k256"] }
 k256 = { version = "0.13", features = ["ecdsa-core", "hash2curve", "sha256"] }
 p256 = { version = "0.13", features = ["ecdsa-core", "hash2curve", "sha256"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
+
+[dev-dependencies]
+rand = "0.8"
+vsss-rs = { version = "3.2", features = ["std"] }
