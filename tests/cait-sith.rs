@@ -75,7 +75,6 @@ fn apply_hd_key_signing() {
     let tweak = deriver.to_inner();
     assert_eq!(signing_key, original_secrets[0] + original_secrets[1] * tweak);
 
-
     let expected_verification_key = deriver.compute_public_key(&public_keys);
     let actual_verification_key = public_keys[0] + public_keys[1] * tweak;
     assert_eq!(expected_verification_key, actual_verification_key);
@@ -87,4 +86,33 @@ fn apply_hd_key_signing() {
     assert!(vk.verify(&[0u8; 32], &signature).is_ok());
 
     // Test presign
+    let (triples_public1, triples_secret1) = cait_sith::triples::deal::<k256::Secp256k1>(&mut rng, &participants, 2);
+    let (triples_public2, triples_secret2) = cait_sith::triples::deal::<k256::Secp256k1>(&mut rng, &participants, 2);
+    let (triples_public3, triples_secret3) = cait_sith::triples::deal::<k256::Secp256k1>(&mut rng, &participants, 2);
+    let (triples_public4, triples_secret4) = cait_sith::triples::deal::<k256::Secp256k1>(&mut rng, &participants, 2);
+
+    let presig1 = Box::new(cait_sith::presign(&participants, participants[0], cait_sith::PresignArguments {
+        triple0: (triples_secret1[0].clone(), triples_public1.clone()),
+        triple1: (triples_secret2[0].clone(), triples_public2.clone()),
+        keygen_out: cait_sith::KeygenOutput {
+            private_share: participant_derived_keys[0].private_share,
+            public_key: expected_verification_key.to_affine(),
+        },
+        threshold: 2,
+    }).unwrap());
+
+    let presig2 = Box::new(cait_sith::presign(&participants, participants[1], cait_sith::PresignArguments {
+        triple0: (triples_secret1[1].clone(), triples_public1.clone()),
+        triple1: (triples_secret2[1].clone(), triples_public2.clone()),
+        keygen_out: cait_sith::KeygenOutput {
+            private_share: participant_derived_keys[1].private_share,
+            public_key: expected_verification_key.to_affine(),
+        },
+        threshold: 2,
+    }).unwrap());
+
+    let protocols = vec![(participants[0], presig1), (participants[1], presig2)];
+    let presigs = cait_sith::protocol::run_protocol(protocols).unwrap();
+
+    cait_sith::sign(&participants, participants[0], expected_verification_key.to_affine(), ).unwrap();
 }

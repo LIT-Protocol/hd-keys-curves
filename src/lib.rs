@@ -428,7 +428,6 @@ fn compute_secret_key() {
     let deriver = HdKeyDeriverType::K256.create_deriver::<k256::Secp256k1>(b"id", b"LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_").unwrap();
     let p0 = deriver.compute_secret_key(&[d0_shares[0], d1_shares[0]]);
     let p1 = deriver.compute_secret_key(&[d0_shares[1], d1_shares[1]]);
-    // let p2 = deriver.compute_secret_key(&[d0_shares[2], d1_shares[2]]);
 
     let shares = [p0, p1]
         .iter()
