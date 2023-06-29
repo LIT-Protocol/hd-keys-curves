@@ -8,10 +8,9 @@ use std::{
 
 fn main() {
     const START: usize = 1000;
-    const STOP: usize = 1000000;
+    const STOP: usize = 100000;
     const STEP: usize = 1000;
-    let deriver = HdKeyDeriverType::K256
-        .create_deriver::<Secp256k1>(
+    let deriver = HdKeyDeriver::<Secp256k1>::new(
             b"cait-sith-id",
             b"LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_",
         )

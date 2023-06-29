@@ -3,7 +3,6 @@ mod error;
 
 pub use error::*;
 
-use byteorder::{BigEndian, ReadBytesExt};
 use cait_sith::{CSCurve, KeygenOutput};
 use std::fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex};
 
@@ -11,6 +10,7 @@ use crate::deriver::hash_to_scalar;
 use k256::elliptic_curve::group::cofactor::CofactorGroup;
 use k256::elliptic_curve::hash2curve::FromOkm;
 use k256::elliptic_curve::{group::Curve, hash2curve::GroupDigest, CurveArithmetic, Field, Group, PrimeField};
+use p256::elliptic_curve::ScalarPrimitive;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Hash, Ord, PartialOrd, Eq, PartialEq, Deserialize, Serialize)]
@@ -159,13 +159,9 @@ fn sum_of_products_pippenger<C: CurveArithmetic>(
     let scalars = scalars
         .iter()
         .map(|s| {
-            let repr = s.to_repr();
             let mut out = [0u64; 4];
-            let mut cursor = std::io::Cursor::new(repr.as_ref());
-            out[3] = cursor.read_u64::<BigEndian>().unwrap();
-            out[2] = cursor.read_u64::<BigEndian>().unwrap();
-            out[1] = cursor.read_u64::<BigEndian>().unwrap();
-            out[0] = cursor.read_u64::<BigEndian>().unwrap();
+            let primitive: ScalarPrimitive<C> = (*s).into();
+            out.copy_from_slice(primitive.as_limbs().iter().map(|l| l.0 as u64).collect::<Vec<_>>().as_slice());
             out
         })
         .collect::<Vec<_>>();
@@ -330,8 +326,7 @@ fn compute_secret_key() {
         .map(|s| <Vec<u8> as vsss_rs::Share>::as_field_element::<k256::Scalar>(s).unwrap())
         .collect::<Vec<_>>();
 
-    let deriver = HdKeyDeriverType::K256
-        .create_deriver::<k256::Secp256k1>(b"id", b"LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_")
+    let deriver = HdKeyDeriver::<k256::Secp256k1>::new(b"id", b"LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_")
         .unwrap();
     let p0 = deriver.compute_secret_key(&[d0_shares[0], d1_shares[0]]);
     let p1 = deriver.compute_secret_key(&[d0_shares[1], d1_shares[1]]);
