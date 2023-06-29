@@ -1,3 +1,4 @@
+use cait_sith::{protocol::{Participant, Protocol}, PresignOutput};
 use digest::{Digest, FixedOutput};
 use k256::{Scalar, elliptic_curve::Field, ProjectivePoint, ecdsa::{Signature, signature::{Signer, Verifier}}, Secp256k1, FieldBytes};
 use k256::ecdsa::hazmat::DigestPrimitive;
@@ -141,7 +142,14 @@ fn apply_hd_key_signing() {
         .unwrap(),
     );
 
-    let protocols = vec![(participants[0], presig1), (participants[1], presig2)];
+     let mut protocols: Vec<(
+        Participant,
+        Box<dyn Protocol<Output = PresignOutput<Secp256k1>>>,
+    )> = Vec::with_capacity(participants.len());
+    
+    protocols.push( (participants[0], presig1));
+    protocols.push( (participants[1], presig2));
+
     let presigs = cait_sith::protocol::run_protocol(protocols).unwrap();
 
     let msg = [0u8; 32];
@@ -152,7 +160,7 @@ fn apply_hd_key_signing() {
         &participants,
         participants[0],
         expected_verification_key.to_affine(),
-        cait_sith::PresignOutput {
+        cait_sith::PresignOutput::<Secp256k1> {
             big_r: presigs[0].1.big_r,
             k: presigs[0].1.k,
             sigma: presigs[0].1.sigma,
