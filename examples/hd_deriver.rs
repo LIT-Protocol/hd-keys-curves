@@ -1,8 +1,8 @@
 use hd_keys_ecdsa::*;
-use k256::*;
 use k256::elliptic_curve::Field;
+use k256::*;
 use std::{
-    io::{Write, stdout},
+    io::{stdout, Write},
     time::SystemTime,
 };
 
@@ -11,12 +11,20 @@ fn main() {
     const STOP: usize = 1000000;
     const STEP: usize = 1000;
     let deriver = HdKeyDeriverType::K256
-        .create_deriver::<Secp256k1>(b"cait-sith-id", b"LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_")
+        .create_deriver::<Secp256k1>(
+            b"cait-sith-id",
+            b"LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_",
+        )
         .unwrap();
     print!("Creating root keys...");
     stdout().flush().unwrap();
-    let root_secret_keys = (0..STOP).map(|_| Scalar::random(&mut rand::thread_rng())).collect::<Vec<_>>();
-    let root_public_keys = root_secret_keys.iter().map(|s| ProjectivePoint::GENERATOR * s).collect::<Vec<_>>();
+    let root_secret_keys = (0..STOP)
+        .map(|_| Scalar::random(&mut rand::thread_rng()))
+        .collect::<Vec<_>>();
+    let root_public_keys = root_secret_keys
+        .iter()
+        .map(|s| ProjectivePoint::GENERATOR * s)
+        .collect::<Vec<_>>();
     println!("done");
 
     for i in (START..=STOP).step_by(STEP) {

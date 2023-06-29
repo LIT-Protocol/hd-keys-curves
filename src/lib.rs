@@ -1,155 +1,42 @@
+mod deriver;
 mod error;
 
 pub use error::*;
 
 use byteorder::{BigEndian, ReadBytesExt};
 use cait_sith::{CSCurve, KeygenOutput};
-use std::{
-    convert::Infallible,
-    fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex},
-    str::FromStr,
-};
+use std::fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex};
 
-use k256::{
-    ecdsa::hazmat::DigestPrimitive,
-    elliptic_curve::{
-        group::Curve,
-        hash2curve::{ExpandMsgXmd, GroupDigest},
-        CurveArithmetic, Field, Group, PrimeField,
-    },
-};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-#[derive(Debug, Clone, Copy, Hash, Ord, PartialOrd, Eq, PartialEq)]
-#[repr(u8)]
-pub enum HdKeyDeriverType {
-    Unknown = 0,
-    K256 = 1,
-    P256 = 2,
-}
-
-impl Display for HdKeyDeriverType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::K256 => write!(f, "K256"),
-            Self::P256 => write!(f, "P256"),
-            Self::Unknown => write!(f, "Unknown"),
-        }
-    }
-}
-
-impl From<u8> for HdKeyDeriverType {
-    fn from(v: u8) -> Self {
-        match v {
-            1 => Self::K256,
-            2 => Self::P256,
-            _ => Self::Unknown,
-        }
-    }
-}
-
-impl FromStr for HdKeyDeriverType {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "K256" => Ok(Self::K256),
-            "P256" => Ok(Self::P256),
-            _ => Ok(Self::Unknown),
-        }
-    }
-}
-
-impl LowerHex for HdKeyDeriverType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:x}", *self as u8)
-    }
-}
-
-impl UpperHex for HdKeyDeriverType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:X}", *self as u8)
-    }
-}
-
-impl Serialize for HdKeyDeriverType {
-    fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        if s.is_human_readable() {
-            s.serialize_str(&self.to_string())
-        } else {
-            s.serialize_u8(*self as u8)
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for HdKeyDeriverType {
-    fn deserialize<D>(d: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        if d.is_human_readable() {
-            let s = String::deserialize(d)?;
-            Self::from_str(&s).map_err(serde::de::Error::custom)
-        } else {
-            let v = u8::deserialize(d)?;
-            Ok(Self::from(v))
-        }
-    }
-}
-
-impl HdKeyDeriverType {
-    pub fn create_deriver<C: CurveArithmetic>(
-        &self,
-        id: &[u8],
-        cxt: &[u8],
-    ) -> Result<HdKeyDeriver<C>, Error> {
-        let inner = self.hash_to_scalar::<C>(id, cxt)?;
-        Ok(HdKeyDeriver(inner))
-    }
-
-    pub fn hash_to_scalar<C: CurveArithmetic>(&self, inputs: &[u8], cxt: &[u8]) -> Result<C::Scalar, Error> {
-        let mut repr = C::Scalar::ONE.to_repr();
-        match self {
-            Self::K256 => {
-                let scalar = k256::Secp256k1::hash_to_scalar::<
-                    ExpandMsgXmd<<k256::Secp256k1 as DigestPrimitive>::Digest>,
-                >(&[inputs], &[cxt])?;
-                repr.as_mut().copy_from_slice(scalar.to_repr().as_ref());
-            }
-            Self::P256 => {
-                let scalar = p256::NistP256::hash_to_scalar::<
-                    ExpandMsgXmd<<p256::NistP256 as DigestPrimitive>::Digest>,
-                >(&[inputs], &[cxt])?;
-                repr.as_mut().copy_from_slice(scalar.to_repr().as_ref());
-            }
-            Self::Unknown => return Err(Error::InvalidKeyDeriveType(*self as u8)),
-        };
-
-        let inner = Option::<C::Scalar>::from(C::Scalar::from_repr(repr))
-            .ok_or(Error::CurveMismatchOrInvalidShare)?;
-        Ok(inner)
-    }
-
-    pub fn from_hex(s: &str) -> Result<Self, Error> {
-        // only two types so from_str is okay since it's infallible to be less than 10.
-        let v = u8::from_str(s)?;
-        Ok(Self::from(v))
-    }
-}
+use crate::deriver::hash_to_scalar;
+use k256::elliptic_curve::group::cofactor::CofactorGroup;
+use k256::elliptic_curve::hash2curve::FromOkm;
+use k256::elliptic_curve::{group::Curve, hash2curve::GroupDigest, CurveArithmetic, Field, Group, PrimeField};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Hash, Ord, PartialOrd, Eq, PartialEq, Deserialize, Serialize)]
-pub struct HdKeyDeriver<C: CurveArithmetic>(C::Scalar);
+pub struct HdKeyDeriver<C>(C::Scalar)
+where
+    C: GroupDigest,
+    <C as CurveArithmetic>::ProjectivePoint: CofactorGroup,
+    <C as CurveArithmetic>::Scalar: FromOkm;
 
-impl<C: CurveArithmetic> Display for HdKeyDeriver<C> {
+impl<C> Display for HdKeyDeriver<C>
+where
+    C: GroupDigest,
+    <C as CurveArithmetic>::ProjectivePoint: CofactorGroup,
+    <C as CurveArithmetic>::Scalar: FromOkm,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{:x}", self)
     }
 }
 
-impl<C: CurveArithmetic> LowerHex for HdKeyDeriver<C> {
+impl<C> LowerHex for HdKeyDeriver<C>
+where
+    C: GroupDigest,
+    <C as CurveArithmetic>::ProjectivePoint: CofactorGroup,
+    <C as CurveArithmetic>::Scalar: FromOkm,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for b in self.0.to_repr().as_ref() {
             write!(f, "{:x}", b)?;
@@ -158,7 +45,12 @@ impl<C: CurveArithmetic> LowerHex for HdKeyDeriver<C> {
     }
 }
 
-impl<C: CurveArithmetic> UpperHex for HdKeyDeriver<C> {
+impl<C> UpperHex for HdKeyDeriver<C>
+where
+    C: GroupDigest,
+    <C as CurveArithmetic>::ProjectivePoint: CofactorGroup,
+    <C as CurveArithmetic>::Scalar: FromOkm,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for b in self.0.to_repr().as_ref() {
             write!(f, "{:X}", b)?;
@@ -167,7 +59,16 @@ impl<C: CurveArithmetic> UpperHex for HdKeyDeriver<C> {
     }
 }
 
-impl<C: CurveArithmetic> HdKeyDeriver<C> {
+impl<C> HdKeyDeriver<C>
+where
+    C: GroupDigest,
+    <C as CurveArithmetic>::ProjectivePoint: CofactorGroup,
+    <C as CurveArithmetic>::Scalar: FromOkm,
+{
+    pub fn new(id: &[u8], cxt: &[u8]) -> Result<Self, Error> {
+        Ok(Self(hash_to_scalar::<C>(id, cxt)?))
+    }
+
     pub fn compute_secret_key_share_cait_sith<S: CSCurve>(
         &self,
         shares: &[KeygenOutput<S>],
@@ -220,7 +121,7 @@ impl<C: CurveArithmetic> HdKeyDeriver<C> {
         for i in 2..powers.len() {
             powers[i] = powers[i - 1] * self.0;
         }
-        sum_of_products_pippenger::<C>(&public_keys, &powers)
+        sum_of_products_pippenger::<C>(public_keys, &powers)
     }
 
     pub fn to_bytes(&self) -> [u8; 32] {
@@ -255,16 +156,19 @@ fn sum_of_products_pippenger<C: CurveArithmetic>(
     const EDGE: usize = WINDOW - 1;
     const MASK: u64 = (NUM_BUCKETS - 1) as u64;
 
-    let scalars = scalars.iter().map(|s| {
-        let repr = s.to_repr();
-        let mut out = [0u64; 4];
-        let mut cursor = std::io::Cursor::new(repr.as_ref());
-        out[3] = cursor.read_u64::<BigEndian>().unwrap();
-        out[2] = cursor.read_u64::<BigEndian>().unwrap();
-        out[1] = cursor.read_u64::<BigEndian>().unwrap();
-        out[0] = cursor.read_u64::<BigEndian>().unwrap();
-        out
-    }).collect::<Vec<_>>();
+    let scalars = scalars
+        .iter()
+        .map(|s| {
+            let repr = s.to_repr();
+            let mut out = [0u64; 4];
+            let mut cursor = std::io::Cursor::new(repr.as_ref());
+            out[3] = cursor.read_u64::<BigEndian>().unwrap();
+            out[2] = cursor.read_u64::<BigEndian>().unwrap();
+            out[1] = cursor.read_u64::<BigEndian>().unwrap();
+            out[0] = cursor.read_u64::<BigEndian>().unwrap();
+            out
+        })
+        .collect::<Vec<_>>();
     let num_components = std::cmp::min(points.len(), scalars.len());
     let mut buckets = [<C::ProjectivePoint as Group>::identity(); NUM_BUCKETS];
     let mut res = C::ProjectivePoint::identity();
@@ -286,8 +190,7 @@ fn sum_of_products_pippenger<C: CurveArithmetic>(
                 // there is no word before
                 let smaller_mask = ((1 << (bit_index + 1)) - 1) as u64;
                 for i in 0..num_components {
-                    let bucket_index: usize =
-                        (scalars[i][word_index] & smaller_mask) as usize;
+                    let bucket_index: usize = (scalars[i][word_index] & smaller_mask) as usize;
                     if bucket_index > 0 {
                         buckets[bucket_index] += points[i];
                         if bucket_index > max_bucket {
@@ -295,8 +198,7 @@ fn sum_of_products_pippenger<C: CurveArithmetic>(
                         }
                     }
                 }
-            }
-            else {
+            } else {
                 // there is a word before
                 let high_order_mask = ((1 << (bit_index + 1)) - 1) as u64;
                 let high_order_shift = EDGE - bit_index;
@@ -304,9 +206,8 @@ fn sum_of_products_pippenger<C: CurveArithmetic>(
                 let low_order_shift = 64 - high_order_shift;
                 let prev_word_index = word_index - 1;
                 for i in 0..num_components {
-                    let mut bucket_index = ((scalars[i][word_index] & high_order_mask)
-                        << high_order_shift)
-                        as usize;
+                    let mut bucket_index =
+                        ((scalars[i][word_index] & high_order_mask) << high_order_shift) as usize;
                     bucket_index |= ((scalars[i][prev_word_index] >> low_order_shift)
                         & low_order_mask) as usize;
                     if bucket_index > 0 {
@@ -320,8 +221,7 @@ fn sum_of_products_pippenger<C: CurveArithmetic>(
         } else {
             let shift = bit_index - EDGE;
             for i in 0..num_components {
-                let bucket_index: usize =
-                    ((scalars[i][word_index] >> shift) & MASK) as usize;
+                let bucket_index: usize = ((scalars[i][word_index] >> shift) & MASK) as usize;
                 if bucket_index > 0 {
                     buckets[bucket_index] += points[i];
                     if bucket_index > max_bucket {
@@ -360,7 +260,7 @@ fn pippinger_k256_known() {
         k256::Scalar::from(2u64),
         k256::Scalar::from(3u64),
     ];
-    let expected = points[0]*scalars[0] + points[1]*scalars[1] + points[2]*scalars[2];
+    let expected = points[0] * scalars[0] + points[1] * scalars[1] + points[2] * scalars[2];
 
     let actual = sum_of_products_pippenger::<k256::Secp256k1>(&points, &scalars);
 
@@ -406,7 +306,7 @@ fn pippinger_p256_known() {
         p256::Scalar::from(2u64),
         p256::Scalar::from(3u64),
     ];
-    let expected = points[0]*scalars[0] + points[1]*scalars[1] + points[2]*scalars[2];
+    let expected = points[0] * scalars[0] + points[1] * scalars[1] + points[2] * scalars[2];
 
     let actual = sum_of_products_pippenger::<p256::NistP256>(&points, &scalars);
 
@@ -430,7 +330,9 @@ fn compute_secret_key() {
         .map(|s| <Vec<u8> as vsss_rs::Share>::as_field_element::<k256::Scalar>(s).unwrap())
         .collect::<Vec<_>>();
 
-    let deriver = HdKeyDeriverType::K256.create_deriver::<k256::Secp256k1>(b"id", b"LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_").unwrap();
+    let deriver = HdKeyDeriverType::K256
+        .create_deriver::<k256::Secp256k1>(b"id", b"LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_")
+        .unwrap();
     let p0 = deriver.compute_secret_key(&[d0_shares[0], d1_shares[0]]);
     let p1 = deriver.compute_secret_key(&[d0_shares[1], d1_shares[1]]);
 

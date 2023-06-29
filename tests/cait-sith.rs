@@ -1,8 +1,15 @@
 use digest::{Digest, FixedOutput};
-use k256::{Scalar, elliptic_curve::Field, ProjectivePoint, ecdsa::{Signature, signature::{Signer, Verifier}}, Secp256k1, FieldBytes};
 use k256::ecdsa::hazmat::DigestPrimitive;
-use k256::elliptic_curve::Curve;
 use k256::elliptic_curve::ops::Reduce;
+use k256::elliptic_curve::Curve;
+use k256::{
+    ecdsa::{
+        signature::{Signer, Verifier},
+        Signature,
+    },
+    elliptic_curve::Field,
+    FieldBytes, ProjectivePoint, Scalar, Secp256k1,
+};
 use vsss_rs::Share;
 
 #[test]
@@ -32,7 +39,8 @@ fn apply_hd_key_signing() {
     ];
 
     // Cait-Sith has KeygenOutputs so convert the secret shares to KeygenOutputs
-    let mut participant_shares: Vec<Vec<cait_sith::KeygenOutput<k256::Secp256k1>>> = Vec::with_capacity(participants.len());
+    let mut participant_shares: Vec<Vec<cait_sith::KeygenOutput<k256::Secp256k1>>> =
+        Vec::with_capacity(participants.len());
     for i in 0..participants.len() {
         let mut participant_share = Vec::with_capacity(participants.len());
 
@@ -148,17 +156,20 @@ fn apply_hd_key_signing() {
 
     let signing_request_id = b"00000000-0000-0000-0000-000000000000";
 
-    let sig1 = Box::new(cait_sith::sign(
-        &participants,
-        participants[0],
-        expected_verification_key.to_affine(),
-        cait_sith::PresignOutput {
-            big_r: presigs[0].1.big_r,
-            k: presigs[0].1.k,
-            sigma: presigs[0].1.sigma,
-        },
-        msg_signable_digest(&msg),
-    ).unwrap());
+    let sig1 = Box::new(
+        cait_sith::sign(
+            &participants,
+            participants[0],
+            expected_verification_key.to_affine(),
+            cait_sith::PresignOutput {
+                big_r: presigs[0].1.big_r,
+                k: presigs[0].1.k,
+                sigma: presigs[0].1.sigma,
+            },
+            msg_signable_digest(&msg),
+        )
+        .unwrap(),
+    );
 }
 
 fn msg_signable_digest(msg: &[u8]) -> Scalar {
