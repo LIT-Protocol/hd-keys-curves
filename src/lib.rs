@@ -106,18 +106,23 @@ impl HdKeyDeriverType {
         id: &[u8],
         cxt: &[u8],
     ) -> Result<HdKeyDeriver<C>, Error> {
+        let inner = self.hash_to_scalar::<C>(id, cxt)?;
+        Ok(HdKeyDeriver(inner))
+    }
+
+    pub fn hash_to_scalar<C: CurveArithmetic>(&self, inputs: &[u8], cxt: &[u8]) -> Result<C::Scalar, Error> {
         let mut repr = C::Scalar::ONE.to_repr();
         match self {
             Self::K256 => {
                 let scalar = k256::Secp256k1::hash_to_scalar::<
                     ExpandMsgXmd<<k256::Secp256k1 as DigestPrimitive>::Digest>,
-                >(&[id], &[cxt])?;
+                >(&[inputs], &[cxt])?;
                 repr.as_mut().copy_from_slice(scalar.to_repr().as_ref());
             }
             Self::P256 => {
                 let scalar = p256::NistP256::hash_to_scalar::<
                     ExpandMsgXmd<<p256::NistP256 as DigestPrimitive>::Digest>,
-                >(&[id], &[cxt])?;
+                >(&[inputs], &[cxt])?;
                 repr.as_mut().copy_from_slice(scalar.to_repr().as_ref());
             }
             Self::Unknown => return Err(Error::InvalidKeyDeriveType(*self as u8)),
@@ -125,7 +130,7 @@ impl HdKeyDeriverType {
 
         let inner = Option::<C::Scalar>::from(C::Scalar::from_repr(repr))
             .ok_or(Error::CurveMismatchOrInvalidShare)?;
-        Ok(HdKeyDeriver(inner))
+        Ok(inner)
     }
 
     pub fn from_hex(s: &str) -> Result<Self, Error> {
