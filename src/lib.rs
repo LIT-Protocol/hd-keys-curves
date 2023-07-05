@@ -6,12 +6,14 @@ pub use error::*;
 use cait_sith::{CSCurve, KeygenOutput};
 use std::fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex};
 
-use crate::deriver::hash_to_scalar;
+use crate::deriver::*;
 use k256::elliptic_curve::group::cofactor::CofactorGroup;
 use k256::elliptic_curve::hash2curve::FromOkm;
 use k256::elliptic_curve::{group::Curve, hash2curve::GroupDigest, CurveArithmetic, Field, Group, PrimeField};
 use p256::elliptic_curve::ScalarPrimitive;
 use serde::{Deserialize, Serialize};
+
+pub use crate::deriver::{compute_rerandomizer, update_cait_sith_presig};
 
 #[derive(Debug, Clone, Copy, Hash, Ord, PartialOrd, Eq, PartialEq, Deserialize, Serialize)]
 pub struct HdKeyDeriver<C>(C::Scalar)
