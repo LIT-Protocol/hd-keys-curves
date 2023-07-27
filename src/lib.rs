@@ -41,7 +41,7 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for b in self.0.to_repr().as_ref() {
-            write!(f, "{:x}", b)?;
+            write!(f, "{:02x}", b)?;
         }
         Ok(())
     }
@@ -55,7 +55,7 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for b in self.0.to_repr().as_ref() {
-            write!(f, "{:X}", b)?;
+            write!(f, "{:02X}", b)?;
         }
         Ok(())
     }
