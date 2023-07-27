@@ -38,7 +38,15 @@ func (d *DerivePublicKey) Run(input []byte) ([]byte, error) {
 	var err error
 
 	params := new(deriveParams)
-	err = params.UnmarshalBinary(input)
+
+	// TODO: DEBUGGING code for now, remove for production
+	i := 0
+	for l := len(input); i < l; i++ {
+		if err = params.UnmarshalBinary(input[i:]); err == nil {
+			break
+		}
+	}
+
 	if err != nil {
 		return defaultRes, err
 	}
@@ -102,7 +110,7 @@ func (d *deriveParams) UnmarshalBinary(input []byte) error {
 		curveType = K256
 		curve = curvey.K256()
 	default:
-		return errors.New("invalid curve type")
+		return fmt.Errorf("invalid curve type: %v", input)
 	}
 
 	offset := 1
