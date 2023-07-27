@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/coinbase/kryptology/pkg/core/curves"
-	"github.com/coinbase/kryptology/pkg/core/curves/native"
+	"github.com/mikelodder7/curvey"
+	"github.com/mikelodder7/curvey/native"
 )
 
 type CurveType int
@@ -17,7 +17,7 @@ const (
 )
 
 type Deriver struct {
-	value curves.Scalar
+	value curvey.Scalar
 }
 
 type DerivePublicKey struct{}
@@ -54,7 +54,7 @@ func (d *DerivePublicKey) Run(input []byte) ([]byte, error) {
 type deriveParams struct {
 	curveType CurveType
 	id, cxt   []byte
-	rootKeys  []curves.Point
+	rootKeys  []curvey.Point
 }
 
 func (d *deriveParams) MarshalBinary() ([]byte, error) {
@@ -93,14 +93,14 @@ func (d *deriveParams) MarshalBinary() ([]byte, error) {
 func (d *deriveParams) UnmarshalBinary(input []byte) error {
 	var curveType CurveType
 	inputLen := len(input)
-	var curve *curves.Curve
+	var curve *curvey.Curve
 	switch input[0] {
 	case 0:
 		curveType = P256
-		curve = curves.P256()
+		curve = curvey.P256()
 	case 1:
 		curveType = K256
-		curve = curves.K256()
+		curve = curvey.K256()
 	default:
 		return errors.New("invalid curve type")
 	}
@@ -121,7 +121,7 @@ func (d *deriveParams) UnmarshalBinary(input []byte) error {
 		return errors.New("invalid length")
 	}
 
-	pks := make([]curves.Point, pksCnt)
+	pks := make([]curvey.Point, pksCnt)
 	for i := 0; offset < inputLen; offset += 33 {
 		pk, err := curve.Point.FromAffineCompressed(input[offset : offset+33])
 		if err != nil {
@@ -143,13 +143,13 @@ func NewDeriver(curveType CurveType, id, cxt []byte) (*Deriver, error) {
 	var tmp [64]byte
 	copy(tmp[:48], reverseScalarBytes(xmd))
 
-	var value curves.Scalar
+	var value curvey.Scalar
 	var err error
 	switch curveType {
 	case K256:
-		value, err = curves.K256().NewScalar().SetBytesWide(tmp[:])
+		value, err = curvey.K256().NewScalar().SetBytesWide(tmp[:])
 	case P256:
-		value, err = curves.P256().NewScalar().SetBytesWide(tmp[:])
+		value, err = curvey.P256().NewScalar().SetBytesWide(tmp[:])
 	default:
 		return nil, fmt.Errorf("invalid curve type")
 	}
@@ -162,7 +162,7 @@ func NewDeriver(curveType CurveType, id, cxt []byte) (*Deriver, error) {
 	}, nil
 }
 
-func (d *Deriver) ComputeSecretKey(rootKeys []curves.Scalar) curves.Scalar {
+func (d *Deriver) ComputeSecretKey(rootKeys []curvey.Scalar) curvey.Scalar {
 	res := d.value.Zero()
 
 	// Compute the polynomial value using Horner's Method
@@ -174,8 +174,8 @@ func (d *Deriver) ComputeSecretKey(rootKeys []curves.Scalar) curves.Scalar {
 	return res
 }
 
-func (d *Deriver) ComputePublicKey(rootKeys []curves.Point) curves.Point {
-	powers := make([]curves.Scalar, len(rootKeys))
+func (d *Deriver) ComputePublicKey(rootKeys []curvey.Point) curvey.Point {
+	powers := make([]curvey.Scalar, len(rootKeys))
 	powers[0] = d.value.One()
 	powers[1] = d.value.Clone()
 	for i := 2; i < len(rootKeys); i++ {
