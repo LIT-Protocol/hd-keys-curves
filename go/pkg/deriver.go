@@ -57,7 +57,9 @@ func (d *DerivePublicKey) Run(input []byte) ([]byte, error) {
 	}
 
 	derivedKey := deriver.ComputePublicKey(params.rootKeys)
-	return derivedKey.ToAffineCompressed(), nil
+	output := derivedKey.ToAffineCompressed()
+	output = append([]byte{byte(len(output))}, output...)
+	return output, nil
 }
 
 type deriveParams struct {
