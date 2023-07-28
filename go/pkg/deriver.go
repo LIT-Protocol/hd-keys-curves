@@ -48,6 +48,7 @@ func (d *DerivePublicKey) Run(input []byte) ([]byte, error) {
 	}
 
 	if err != nil {
+		err = params.UnmarshalBinary(input)
 		return defaultRes, err
 	}
 	deriver, err := NewDeriver(params.curveType, params.id, params.cxt)
