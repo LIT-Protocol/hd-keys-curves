@@ -57,8 +57,7 @@ fn apply_hd_key_signing() {
     }
 
     // Test key derivation
-    let deriver = hd_keys_ecdsa::HdKeyDeriver::<Secp256k1>::new(ID, CXT)
-        .unwrap();
+    let deriver = hd_keys_ecdsa::HdKeyDeriver::<Secp256k1>::new(ID, CXT).unwrap();
     let mut participant_derived_keys = Vec::with_capacity(participants.len());
     for i in 0..participants.len() {
         let derived_key = deriver.compute_secret_key_share_cait_sith(&participant_shares[i]);
@@ -149,25 +148,32 @@ fn apply_hd_key_signing() {
         .unwrap(),
     );
 
-    let protocols: Vec<(Participant, Box<dyn Protocol<Output = cait_sith::PresignOutput<Secp256k1>>>)> = vec![
-        (participants[0], presig1),
-        (participants[1], presig2)
-    ];
+    let protocols: Vec<(
+        Participant,
+        Box<dyn Protocol<Output = cait_sith::PresignOutput<Secp256k1>>>,
+    )> = vec![(participants[0], presig1), (participants[1], presig2)];
     let presigs = cait_sith::protocol::run_protocol(protocols).unwrap();
 
     let msg = [0u8; 32];
 
     let signing_request_id = b"00000000-0000-0000-0000-000000000000";
 
-    let presigs = presigs.iter().map(|(participant, presig)| {
-        (participant, hd_keys_ecdsa::update_cait_sith_presig(
-            expected_verification_key.to_affine(),
-            presig,
-            &msg,
-            signing_request_id,
-            CXT
-        ).unwrap())
-    }).collect::<Vec<_>>();
+    let presigs = presigs
+        .iter()
+        .map(|(participant, presig)| {
+            (
+                participant,
+                hd_keys_ecdsa::update_cait_sith_presig(
+                    expected_verification_key.to_affine(),
+                    presig,
+                    &msg,
+                    signing_request_id,
+                    CXT,
+                )
+                .unwrap(),
+            )
+        })
+        .collect::<Vec<_>>();
 
     let signable_msg = msg_signable_digest(&msg);
     let sig1 = Box::new(
@@ -187,9 +193,13 @@ fn apply_hd_key_signing() {
             expected_verification_key.to_affine(),
             presigs[1].1.clone(),
             signable_msg,
-        ).unwrap()
+        )
+        .unwrap(),
     );
-    let protocols: Vec<(Participant, Box<dyn Protocol<Output = cait_sith::FullSignature<Secp256k1>>>)> = vec![(participants[0], sig1), (participants[1], sig2)];
+    let protocols: Vec<(
+        Participant,
+        Box<dyn Protocol<Output = cait_sith::FullSignature<Secp256k1>>>,
+    )> = vec![(participants[0], sig1), (participants[1], sig2)];
     let sigs = cait_sith::protocol::run_protocol(protocols).unwrap();
 
     assert_eq!(sigs[0].1.big_r, sigs[1].1.big_r);

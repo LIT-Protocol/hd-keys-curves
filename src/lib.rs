@@ -9,7 +9,9 @@ use std::fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex};
 use crate::deriver::*;
 use k256::elliptic_curve::group::cofactor::CofactorGroup;
 use k256::elliptic_curve::hash2curve::FromOkm;
-use k256::elliptic_curve::{group::Curve, hash2curve::GroupDigest, CurveArithmetic, Field, Group, PrimeField};
+use k256::elliptic_curve::{
+    group::Curve, hash2curve::GroupDigest, CurveArithmetic, Field, Group, PrimeField,
+};
 use p256::elliptic_curve::ScalarPrimitive;
 use serde::{Deserialize, Serialize};
 
@@ -158,15 +160,7 @@ fn sum_of_products_pippenger<C: CurveArithmetic>(
     const EDGE: usize = WINDOW - 1;
     const MASK: u64 = (NUM_BUCKETS - 1) as u64;
 
-    let scalars = scalars
-        .iter()
-        .map(|s| {
-            let mut out = [0u64; 4];
-            let primitive: ScalarPrimitive<C> = (*s).into();
-            out.copy_from_slice(primitive.as_limbs().iter().map(|l| l.0 as u64).collect::<Vec<_>>().as_slice());
-            out
-        })
-        .collect::<Vec<_>>();
+    let scalars = convert_scalars::<C>(scalars);
     let num_components = std::cmp::min(points.len(), scalars.len());
     let mut buckets = [<C::ProjectivePoint as Group>::identity(); NUM_BUCKETS];
     let mut res = C::ProjectivePoint::identity();
@@ -250,6 +244,50 @@ fn sum_of_products_pippenger<C: CurveArithmetic>(
     res
 }
 
+#[cfg(target_pointer_width = "32")]
+fn convert_scalars<C: CurveArithmetic>(scalars: &[C::Scalar]) -> Vec<[u64; 4]> {
+    scalars
+        .iter()
+        .map(|s| {
+            let mut out = [0u64; 4];
+            let primitive: ScalarPrimitive<C> = (*s).into();
+            let small_limbs = primitive
+                .as_limbs()
+                .iter()
+                .map(|l| l.0 as u64)
+                .collect::<Vec<_>>();
+            let mut i = 0;
+            let mut j = 0;
+            while i < small_limbs.len() && j < out.len() {
+                out[j] = small_limbs[i + 1] << 32 | small_limbs[i];
+                i += 2;
+                j += 1;
+            }
+            out
+        })
+        .collect::<Vec<_>>()
+}
+
+#[cfg(target_pointer_width = "64")]
+fn convert_scalars<C: CurveArithmetic>(scalars: &[C::Scalar]) -> Vec<[u64; 4]> {
+    scalars
+        .iter()
+        .map(|s| {
+            let mut out = [0u64; 4];
+            let primitive: ScalarPrimitive<C> = (*s).into();
+            out.copy_from_slice(
+                primitive
+                    .as_limbs()
+                    .iter()
+                    .map(|l| l.0 as u64)
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            );
+            out
+        })
+        .collect::<Vec<_>>()
+}
+
 #[test]
 fn pippinger_k256_known() {
     let points = [k256::ProjectivePoint::GENERATOR; 3];
@@ -328,8 +366,9 @@ fn compute_secret_key() {
         .map(|s| <Vec<u8> as vsss_rs::Share>::as_field_element::<k256::Scalar>(s).unwrap())
         .collect::<Vec<_>>();
 
-    let deriver = HdKeyDeriver::<k256::Secp256k1>::new(b"id", b"LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_")
-        .unwrap();
+    let deriver =
+        HdKeyDeriver::<k256::Secp256k1>::new(b"id", b"LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_")
+            .unwrap();
     let p0 = deriver.compute_secret_key(&[d0_shares[0], d1_shares[0]]);
     let p1 = deriver.compute_secret_key(&[d0_shares[1], d1_shares[1]]);
 

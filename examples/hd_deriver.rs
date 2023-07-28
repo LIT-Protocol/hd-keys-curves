@@ -11,10 +11,10 @@ fn main() {
     const STOP: usize = 100000;
     const STEP: usize = 1000;
     let deriver = HdKeyDeriver::<Secp256k1>::new(
-            b"cait-sith-id",
-            b"LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_",
-        )
-        .unwrap();
+        b"cait-sith-id",
+        b"LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_",
+    )
+    .unwrap();
     print!("Creating root keys...");
     stdout().flush().unwrap();
     let root_secret_keys = (0..STOP)
