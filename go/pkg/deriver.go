@@ -141,12 +141,12 @@ func (d *deriveParams) UnmarshalBinary(input []byte) error {
 	pksCnt := int(binary.BigEndian.Uint32(input[offset : offset+4]))
 	offset += 4
 
-	if (inputLen-offset)%33 != 0 || pksCnt == 0 {
-		return errors.New("invalid length")
+	if pksCnt == 0 || (offset+pksCnt*33) > inputLen {
+		return fmt.Errorf("invalid length %v", input)
 	}
 
 	pks := make([]curvey.Point, pksCnt)
-	for i := 0; offset < inputLen; offset += 33 {
+	for i := 0; offset < inputLen && i < pksCnt; offset += 33 {
 		if offset+33 > inputLen {
 			return fmt.Errorf("invalid length: %v", input)
 		}
