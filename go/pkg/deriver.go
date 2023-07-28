@@ -114,6 +114,9 @@ func (d *deriveParams) UnmarshalBinary(input []byte) error {
 	}
 
 	offset := 1
+	if offset+4 > inputLen {
+		return fmt.Errorf("invalid length: %v", input)
+	}
 	idLen := int(binary.BigEndian.Uint32(input[offset : offset+4]))
 	offset += 4
 	if offset+idLen > inputLen || idLen == 0 {
@@ -121,6 +124,9 @@ func (d *deriveParams) UnmarshalBinary(input []byte) error {
 	}
 	id := input[offset : offset+idLen]
 	offset += idLen
+	if offset+4 > inputLen {
+		return fmt.Errorf("invalid length: %v", input)
+	}
 	cxtLen := int(binary.BigEndian.Uint32(input[offset : offset+4]))
 	offset += 4
 	if offset+cxtLen > inputLen || cxtLen == 0 {
@@ -128,6 +134,9 @@ func (d *deriveParams) UnmarshalBinary(input []byte) error {
 	}
 	cxt := input[offset : offset+cxtLen]
 	offset += cxtLen
+	if offset+4 > inputLen {
+		return fmt.Errorf("invalid length: %v", input)
+	}
 	pksCnt := int(binary.BigEndian.Uint32(input[offset : offset+4]))
 	offset += 4
 

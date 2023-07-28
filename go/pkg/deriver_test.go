@@ -54,6 +54,14 @@ func TestDeriveParams_Marshaling(t *testing.T) {
 	}
 }
 
+func TestDeriverRun(t *testing.T) {
+	input := []byte{38, 62, 240, 185, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	deriver := new(DerivePublicKey)
+	result, err := deriver.Run(input)
+	require.Error(t, err)
+	require.Nil(t, result)
+}
+
 func TestDeriver_ComputeKeyRandom(t *testing.T) {
 	deriver, err := NewDeriver(K256, []byte("cait-sith-id"), []byte("LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_"))
 	require.NoError(t, err)
