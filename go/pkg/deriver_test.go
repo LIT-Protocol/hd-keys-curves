@@ -31,6 +31,18 @@ func TestDeriveParams_Marshaling(t *testing.T) {
 	output, err := params.MarshalBinary()
 	fmt.Printf("%x", output)
 	require.NoError(t, err)
+
+	dd := new(DerivePublicKey)
+
+	prefix := []byte{38, 62, 240, 185, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15}
+	tmp := make([]byte, len(output)+len(prefix))
+	copy(tmp[:len(prefix)], prefix)
+	copy(tmp[len(prefix):], output)
+
+	result, err := dd.Run(tmp)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
 	params2 := new(deriveParams)
 	err = params2.UnmarshalBinary(output)
 	require.NoError(t, err)

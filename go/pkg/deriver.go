@@ -116,21 +116,30 @@ func (d *deriveParams) UnmarshalBinary(input []byte) error {
 	offset := 1
 	idLen := int(binary.BigEndian.Uint32(input[offset : offset+4]))
 	offset += 4
+	if offset+idLen > inputLen || idLen == 0 {
+		return fmt.Errorf("invalid length: %v", input)
+	}
 	id := input[offset : offset+idLen]
 	offset += idLen
 	cxtLen := int(binary.BigEndian.Uint32(input[offset : offset+4]))
 	offset += 4
+	if offset+cxtLen > inputLen || cxtLen == 0 {
+		return fmt.Errorf("invalid length: %v", input)
+	}
 	cxt := input[offset : offset+cxtLen]
 	offset += cxtLen
 	pksCnt := int(binary.BigEndian.Uint32(input[offset : offset+4]))
 	offset += 4
 
-	if (inputLen-offset)%33 != 0 {
+	if (inputLen-offset)%33 != 0 || pksCnt == 0 {
 		return errors.New("invalid length")
 	}
 
 	pks := make([]curvey.Point, pksCnt)
 	for i := 0; offset < inputLen; offset += 33 {
+		if offset+33 > inputLen {
+			return fmt.Errorf("invalid length: %v", input)
+		}
 		pk, err := curve.Point.FromAffineCompressed(input[offset : offset+33])
 		if err != nil {
 			return err
