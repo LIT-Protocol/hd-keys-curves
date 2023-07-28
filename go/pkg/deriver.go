@@ -45,6 +45,9 @@ func (d *DerivePublicKey) Run(input []byte) ([]byte, error) {
 		if err = params.UnmarshalBinary(input[i:]); err == nil {
 			break
 		}
+		if l-i < MinParamsByteLength {
+			break
+		}
 	}
 
 	if err != nil {
@@ -59,6 +62,17 @@ func (d *DerivePublicKey) Run(input []byte) ([]byte, error) {
 	derivedKey := deriver.ComputePublicKey(params.rootKeys)
 	return derivedKey.ToAffineCompressed(), nil
 }
+
+// MinParamsByteLength is 81 bytes as follows
+// 1 for curveType
+// 4 bytes for the id length
+// 1 byte minimum for id
+// 4 bytes for the cxt length
+// 1 byte minimum for the cxt
+// 4 bytes for the number of public keys
+// 33 bytes per public key with 2 keys minimum
+// 81
+const MinParamsByteLength = 81
 
 type deriveParams struct {
 	curveType CurveType
@@ -101,8 +115,14 @@ func (d *deriveParams) MarshalBinary() ([]byte, error) {
 
 func (d *deriveParams) UnmarshalBinary(input []byte) error {
 	var curveType CurveType
-	inputLen := len(input)
 	var curve *curvey.Curve
+
+	inputLen := len(input)
+
+	if inputLen < MinParamsByteLength {
+		return fmt.Errorf("invalid length: %v", input)
+	}
+
 	switch input[0] {
 	case 0:
 		curveType = P256
