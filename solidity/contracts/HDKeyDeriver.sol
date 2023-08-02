@@ -3,7 +3,7 @@
 pragma solidity ^0.8.17;
 import "solidity-bytes-utils/contracts/BytesLib.sol";
 
-library HDKeyDeriver {
+abstract contract KeyDeriver {
     using BytesLib for bytes;
     
     struct RootKey {
