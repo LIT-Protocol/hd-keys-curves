@@ -220,7 +220,15 @@ func (d *deriveParams) UnmarshalBinary(input []byte) error {
 			pk, err = curve.Point.FromAffineCompressed(input[offset : offset+33])
 			offset += 33
 		default:
-			err = fmt.Errorf("invalid point form")
+			// Try uncompressed form since the leading byte might be missing
+			if offset+64 > inputLen {
+				return fmt.Errorf("invalid length: %v", input)
+			}
+			var tmp [65]byte
+			tmp[0] = 0x4
+			copy(tmp[1:], input[offset:offset+64])
+			pk, err = curve.Point.FromAffineUncompressed(tmp[:])
+			offset += 64
 		}
 		if err != nil {
 			return err
