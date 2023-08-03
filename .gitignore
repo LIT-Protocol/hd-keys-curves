@@ -20,3 +20,4 @@ Cargo.lock
 /target
 /Cargo.lock
 node_modules/
+out/

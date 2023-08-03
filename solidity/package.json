@@ -1,14 +1,10 @@
 {
-  "name": "solidity",
+  "name": "@lit-protocol/hd-key-deriver",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "description": "Computing of hd public keys",
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "LGPL-3.0-or-later",
   "dependencies": {
     "solidity-bytes-utils": "^0.8.0"
   }
