@@ -35,7 +35,7 @@ abstract contract KeyDeriver {
         RootKey[] memory rootHDKeys
     ) private pure returns (bytes memory) {
         // empty array for concating pubkeys
-        bytes memory rootPubkeys = new bytes(0); // each key is 33 bytes
+        bytes memory rootPubkeys = new bytes(0); 
         for (uint256 i = 0; i < rootHDKeys.length; i++) {
             rootPubkeys = rootPubkeys.concat(rootHDKeys[i].pubkey);
         }
