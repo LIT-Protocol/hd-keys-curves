@@ -7,7 +7,7 @@ abstract contract KeyDeriver {
     using BytesLib for bytes;
     
     struct RootKey {
-        bytes pubkey;
+        bytes pubkey; // root keys each 33 bytes (compressed) or 65 bytes (uncompressed) in length
         uint256 keyType;
     }
 
@@ -54,7 +54,7 @@ abstract contract KeyDeriver {
             ctx_len, // 4th arg is a 4 byte big-endian integer for the number of bytes in cxt
             CTX, // 5th arg is the byte sequence for cxt
             pubkey_len, // 6th arg is a 4 byte big-endian integer for the number of root keys
-            rootPubkeys // 7th arg is a variable number of root keys each 33 bytes in length
+            rootPubkeys // 7th arg is a variable number of root keys each 33 bytes (compressed) or 65 bytes (uncompressed) in length
         );
 
         return args_bytes;
