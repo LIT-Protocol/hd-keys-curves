@@ -52,6 +52,17 @@ func TestDeriveParams_Marshaling(t *testing.T) {
 	for i, pk := range params.rootKeys {
 		require.True(t, pk.Equal(params2.rootKeys[i]))
 	}
+
+	output, err = params.ToUncompressedBytes()
+	require.NoError(t, err)
+	err = params2.UnmarshalBinary(output)
+	require.NoError(t, err)
+	require.Equal(t, params.curveType, params2.curveType)
+	require.Equal(t, params.id, params2.id)
+	require.Equal(t, params.cxt, params2.cxt)
+	for i, pk := range params.rootKeys {
+		require.True(t, pk.Equal(params2.rootKeys[i]))
+	}
 }
 
 func TestDeriverRun(t *testing.T) {

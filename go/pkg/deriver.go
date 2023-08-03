@@ -113,6 +113,39 @@ func (d *deriveParams) MarshalBinary() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
+func (d *deriveParams) ToUncompressedBytes() ([]byte, error) {
+	var n int
+	var err error
+	length := len(d.id) + len(d.cxt) + 13 + len(d.rootKeys)*33
+	buffer := new(bytes.Buffer)
+	buffer.Grow(length)
+	// WriteByte always returns nil
+	_ = buffer.WriteByte(byte(d.curveType))
+
+	if err = binary.Write(buffer, binary.BigEndian, uint32(len(d.id))); err != nil {
+		return nil, err
+	}
+	if n, _ = buffer.Write(d.id); n != len(d.id) {
+		return nil, errors.New("unable to write 'id'")
+	}
+	if err = binary.Write(buffer, binary.BigEndian, uint32(len(d.cxt))); err != nil {
+		return nil, err
+	}
+	if n, _ = buffer.Write(d.cxt); n != len(d.cxt) {
+		return nil, err
+	}
+	if err = binary.Write(buffer, binary.BigEndian, uint32(len(d.rootKeys))); err != nil {
+		return nil, err
+	}
+	for _, pt := range d.rootKeys {
+		bb := pt.ToAffineUncompressed()
+		if n, _ = buffer.Write(bb); n != len(bb) {
+			return nil, err
+		}
+	}
+	return buffer.Bytes(), nil
+}
+
 func (d *deriveParams) UnmarshalBinary(input []byte) error {
 	var curveType CurveType
 	var curve *curvey.Curve
@@ -166,11 +199,29 @@ func (d *deriveParams) UnmarshalBinary(input []byte) error {
 	}
 
 	pks := make([]curvey.Point, pksCnt)
-	for i := 0; offset < inputLen && i < pksCnt; offset += 33 {
-		if offset+33 > inputLen {
-			return fmt.Errorf("invalid length: %v", input)
+	for i := 0; offset < inputLen && i < pksCnt; {
+		var pk curvey.Point
+		var err error
+		switch input[offset] {
+		case 04:
+			// Uncompressed form
+			if offset+65 > inputLen {
+				return fmt.Errorf("invalid length: %v", input)
+			}
+			pk, err = curve.Point.FromAffineUncompressed(input[offset : offset+65])
+			offset += 65
+		case 03:
+			// Compressed form
+			fallthrough
+		case 02:
+			if offset+33 > inputLen {
+				return fmt.Errorf("invalid length: %v", input)
+			}
+			pk, err = curve.Point.FromAffineCompressed(input[offset : offset+33])
+			offset += 33
+		default:
+			err = fmt.Errorf("invalid point form")
 		}
-		pk, err := curve.Point.FromAffineCompressed(input[offset : offset+33])
 		if err != nil {
 			return err
 		}
