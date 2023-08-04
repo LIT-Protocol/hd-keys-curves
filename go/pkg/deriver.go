@@ -60,7 +60,7 @@ func (d *DerivePublicKey) Run(input []byte) ([]byte, error) {
 	}
 
 	derivedKey := deriver.ComputePublicKey(params.rootKeys)
-	return derivedKey.ToAffineCompressed(), nil
+	return derivedKey.ToAffineUncompressed(), nil
 }
 
 // MinParamsByteLength is 81 bytes as follows
