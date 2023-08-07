@@ -5,16 +5,6 @@ import "solidity-bytes-utils/contracts/BytesLib.sol";
 
 abstract contract KeyDeriver {
     using BytesLib for bytes;
-    
-    struct RootKey {
-        bytes pubkey; // root keys each 33 bytes (compressed) or 65 bytes (uncompressed) in length
-        uint256 keyType;
-    }
-
-    struct HDKeyParams {
-        bytes32 derivedKeyId;
-        RootKey[] hdRootKeys;
-    }
 
     // address for HD public KDF
     address public constant HD_KDF = 0x0000000000000000000000000000000000000100;
@@ -23,26 +13,27 @@ abstract contract KeyDeriver {
 
     function computeHDPubKey(
         bytes32 derivedKeyId,
-        RootKey[] memory rootHDKeys
+        bytes[] memory rootHDKeys,
+        uint256 keyType
     ) public view returns (bool, bytes memory) {
-        bytes memory args = _buildArgs(derivedKeyId, rootHDKeys);
+        bytes memory args = _buildArgs(derivedKeyId, rootHDKeys, keyType);
         (bool success, bytes memory data) = HD_KDF.staticcall(args);
         return (success, data);
     }
 
     function _buildArgs(
         bytes32 derivedKeyId,
-        RootKey[] memory rootHDKeys
+        bytes[] memory rootHDKeys,
+        uint256 keyType
     ) private pure returns (bytes memory) {
         // empty array for concating pubkeys
         bytes memory rootPubkeys = new bytes(0); 
         for (uint256 i = 0; i < rootHDKeys.length; i++) {
-            rootPubkeys = rootPubkeys.concat(rootHDKeys[i].pubkey);
+            rootPubkeys = rootPubkeys.concat(rootHDKeys[i]);
         }
 
-        uint8 keyType = uint8(rootHDKeys[0].keyType);
         bytes memory CTX = bytes(HD_KDF_CTX);
-	    bytes1 kt = bytes1(keyType);
+	    bytes1 kt = bytes1(uint8(keyType));
         bytes4 id_len = bytes4(uint32(derivedKeyId.length));
         bytes4 ctx_len = bytes4(uint32(CTX.length));
         bytes4 pubkey_len = bytes4(uint32(rootHDKeys.length));
