@@ -78,6 +78,7 @@ func TestDeriverRun(t *testing.T) {
 	require.NotNil(t, result)
 	input, _ = hex.DecodeString("0100000020b6b29bd7863f9d949c1352e0f3cf4b4cc194846e6b5dda28bda465b79e1d83630000002b4c49545f48445f4b45595f49445f4b3235365f584d443a5348412d3235365f535357555f524f5f4e554c5f0000000202706ed9fbf152fcc24fa744f727fb3f1e309344f458f6f1ce5ac395785c40b7580248a534627a648dc2f3a555ae215d887a38d1983b962a32215a4c8ab01817aed0")
 	result, err = deriver.Run(input)
+	fmt.Printf("%s\n", hex.EncodeToString(result))
 	require.NoError(t, err)
 	require.NotNil(t, result)
 }

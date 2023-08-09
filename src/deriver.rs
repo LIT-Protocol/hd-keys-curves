@@ -1,12 +1,14 @@
 use crate::error::Error;
+#[cfg(feature = "cait-sith")]
 use cait_sith::PresignOutput;
 
 use k256::elliptic_curve::{
-    group::{cofactor::CofactorGroup, Curve, GroupEncoding},
+    group::{cofactor::CofactorGroup, GroupEncoding},
     hash2curve::{ExpandMsgXmd, FromOkm, GroupDigest},
-    CurveArithmetic, Field,
+    CurveArithmetic,
 };
 
+#[cfg(feature = "cait-sith")]
 pub fn update_cait_sith_presig<C: cait_sith::CSCurve>(
     verifying_key: C::AffinePoint,
     pre_sig: &PresignOutput<C>,
@@ -19,6 +21,7 @@ where
     <C as CurveArithmetic>::ProjectivePoint: CofactorGroup,
     <C as CurveArithmetic>::Scalar: FromOkm,
 {
+    use k256::elliptic_curve::{group::Curve, Field};
     let rerandomizer =
         compute_rerandomizer::<C>(verifying_key, pre_sig.big_r, message, associated_data, cxt)?;
     let big_r = C::ProjectivePoint::from(pre_sig.big_r) * rerandomizer.invert().unwrap();

@@ -3,19 +3,21 @@ mod error;
 
 pub use error::*;
 
+#[cfg(feature = "cait-sith")]
 use cait_sith::{CSCurve, KeygenOutput};
 use std::fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex};
 
 use crate::deriver::*;
-use k256::elliptic_curve::group::cofactor::CofactorGroup;
-use k256::elliptic_curve::hash2curve::FromOkm;
 use k256::elliptic_curve::{
-    group::Curve, hash2curve::GroupDigest, CurveArithmetic, Field, Group, PrimeField,
+    ScalarPrimitive,
+    hash2curve::{GroupDigest, FromOkm}, CurveArithmetic, Field, Group, PrimeField,
+    group::cofactor::CofactorGroup,
 };
-use p256::elliptic_curve::ScalarPrimitive;
 use serde::{Deserialize, Serialize};
 
-pub use crate::deriver::{compute_rerandomizer, update_cait_sith_presig};
+pub use crate::deriver::compute_rerandomizer;
+#[cfg(feature = "cait-sith")]
+pub use crate::deriver::update_cait_sith_presig;
 
 #[derive(Debug, Clone, Copy, Hash, Ord, PartialOrd, Eq, PartialEq, Deserialize, Serialize)]
 pub struct HdKeyDeriver<C>(C::Scalar)
@@ -73,10 +75,13 @@ where
         Ok(Self(hash_to_scalar::<C>(id, cxt)?))
     }
 
+    #[cfg(feature = "cait-sith")]
     pub fn compute_secret_key_share_cait_sith<S: CSCurve>(
         &self,
         shares: &[KeygenOutput<S>],
     ) -> Result<KeygenOutput<S>, Error> {
+        use k256::elliptic_curve::group::Curve;
+
         let secrets = shares
             .iter()
             .map(|s| {
