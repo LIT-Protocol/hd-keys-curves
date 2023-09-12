@@ -2,6 +2,7 @@
 name = "hd-keys-ecdsa"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2"
 
 [dependencies]
 cait-sith = { git = "https://github.com/LIT-Protocol/cait-sith.git", features = ["k256"], optional = true }
