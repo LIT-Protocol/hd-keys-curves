@@ -12,6 +12,7 @@ use k256::elliptic_curve::{
 pub fn update_cait_sith_presig<C: cait_sith::CSCurve>(
     verifying_key: C::AffinePoint,
     pre_sig: &PresignOutput<C>,
+    private_share: C::Scalar,
     message: &[u8],
     associated_data: &[u8],
     cxt: &[u8],
@@ -21,14 +22,14 @@ where
     <C as CurveArithmetic>::ProjectivePoint: CofactorGroup,
     <C as CurveArithmetic>::Scalar: FromOkm,
 {
-    use k256::elliptic_curve::{group::Curve, Field};
+    use k256::elliptic_curve::group::{Curve, Group};
     let rerandomizer =
         compute_rerandomizer::<C>(verifying_key, pre_sig.big_r, message, associated_data, cxt)?;
-    let big_r = C::ProjectivePoint::from(pre_sig.big_r) * rerandomizer.invert().unwrap();
+    let big_r = C::ProjectivePoint::from(pre_sig.big_r) + C::ProjectivePoint::generator() * rerandomizer;
     Ok(PresignOutput {
         big_r: big_r.to_affine(),
-        k: pre_sig.k * rerandomizer,
-        sigma: pre_sig.sigma * rerandomizer,
+        k: pre_sig.k + rerandomizer,
+        sigma: pre_sig.sigma + rerandomizer * private_share,
     })
 }
 
