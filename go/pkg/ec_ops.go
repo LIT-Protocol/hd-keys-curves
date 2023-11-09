@@ -539,6 +539,7 @@ type EcIsInfinity struct{}
 type EcIsValid struct{}
 type EcHash struct{}
 type EcSumOfProducts struct{}
+type EcPairing struct{}
 type ScAdd struct{}
 type ScMul struct{}
 type ScNeg struct{}
@@ -750,17 +751,17 @@ func (ec *EcSumOfProducts) Run(input []byte) ([]byte, error) {
 func (*EcSumOfProducts) Handle(processor curveHandler, input []byte) ([]byte, error) {
 	bi := new(big.Int).SetBytes(input[:32])
 	ll := int(bi.Int64())
-	if len(input[:32]) < ll {
+	if len(input[32:]) < ll {
 		return nil, fmt.Errorf("invalid length")
 	}
-	read, points, err := processor.InPoint(input, ll)
+	read, points, err := processor.InPoint(input[32:], ll)
 	if err != nil {
 		return nil, err
 	}
 	if len(points) < ll {
 		return nil, fmt.Errorf("insufficient points, expected %d but got %d", ll, len(points))
 	}
-	scalars, err := processor.InScalar(input[read:], ll)
+	scalars, err := processor.InScalar(input[read+32:], ll)
 	if err != nil {
 		return nil, err
 	}
@@ -773,6 +774,48 @@ func (*EcSumOfProducts) Handle(processor curveHandler, input []byte) ([]byte, er
 
 func (*EcSumOfProducts) MinLength(processor curveHandler) int {
 	return processor.PointSize()*2 + scalarSize*2
+}
+
+func (*EcPairing) RequiredGas([]byte) uint64 {
+	return 200
+}
+
+func (ec *EcPairing) Run(input []byte) ([]byte, error) {
+	return executeCommand(ec, input)
+}
+
+func (*EcPairing) Handle(processor curveHandler, input []byte) ([]byte, error) {
+	bi := new(big.Int).SetBytes(input[:32])
+	cnt := int(bi.Int64())
+	if len(input[:32]) < cnt {
+		return nil, fmt.Errorf("invalid length")
+	}
+	buffer := input[32:]
+	if cnt*96+cnt*192 > len(buffer) {
+		return nil, fmt.Errorf("invalid length")
+	}
+	pairingPoints := make([]curvey.PairingPoint, cnt*2)
+	for i := 0; i < cnt*2; i += 2 {
+		pt, err := new(curvey.PointBls12381G1).FromAffineUncompressed(buffer[:96])
+		if err != nil {
+			return nil, err
+		}
+		pairingPoints[i] = pt.(*curvey.PointBls12381G1)
+		buffer = buffer[96:]
+	}
+	for i := 1; i < cnt*2; i += 2 {
+		pt, err := new(curvey.PointBls12381G2).FromAffineUncompressed(buffer[:192])
+		if err != nil {
+			return nil, err
+		}
+		pairingPoints[i] = pt.(*curvey.PointBls12381G2)
+		buffer = buffer[192:]
+	}
+	return new(curvey.PointBls12381G1).MultiPairing(pairingPoints...).Bytes(), nil
+}
+
+func (*EcPairing) MinLength(curveHandler) int {
+	return 48 + 96
 }
 
 func (*ScAdd) RequiredGas([]byte) uint64 {
