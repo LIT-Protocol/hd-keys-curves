@@ -3,8 +3,9 @@ module github.com/LIT-Protocol/hd-keys-ecdsa/go
 go 1.20
 
 require (
-	github.com/mikelodder7/curvey v0.0.0-20230727211329-ba6f795e1f09
+	github.com/mikelodder7/curvey v1.0.2
 	github.com/stretchr/testify v1.8.4
+	golang.org/x/crypto v0.14.0
 )
 
 require (
@@ -16,7 +17,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
-	golang.org/x/crypto v0.11.0 // indirect
-	golang.org/x/sys v0.10.0 // indirect
+	golang.org/x/sys v0.14.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
