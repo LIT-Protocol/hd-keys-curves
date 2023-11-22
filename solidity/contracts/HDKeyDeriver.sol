@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity ^0.8.17;
+pragma solidity 0.8.17;
 import "solidity-bytes-utils/contracts/BytesLib.sol";
 
 abstract contract KeyDeriver {
@@ -27,18 +27,18 @@ abstract contract KeyDeriver {
         uint256 keyType
     ) private pure returns (bytes memory) {
         // empty array for concating pubkeys
-        bytes memory rootPubkeys = new bytes(0); 
+        bytes memory rootPubkeys = new bytes(0);
         for (uint256 i = 0; i < rootHDKeys.length; i++) {
             rootPubkeys = rootPubkeys.concat(rootHDKeys[i]);
         }
 
         bytes memory CTX = bytes(HD_KDF_CTX);
-	    bytes1 kt = bytes1(uint8(keyType));
+        bytes1 kt = bytes1(uint8(keyType));
         bytes4 id_len = bytes4(uint32(derivedKeyId.length));
         bytes4 ctx_len = bytes4(uint32(CTX.length));
         bytes4 pubkey_len = bytes4(uint32(rootHDKeys.length));
-                
-	    bytes memory args_bytes = abi.encodePacked( 
+
+        bytes memory args_bytes = abi.encodePacked(
             kt, // 1st arg is a byte for the curve type, 0 is Nist Prime256, 1 is secp256k1
             id_len, // 2nd arg is a 4 byte big-endian integer for the number of bytes in id
             derivedKeyId, // 3rd arg is the byte sequence for id
