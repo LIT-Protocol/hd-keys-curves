@@ -533,59 +533,64 @@ func (EcOperations) RequiredGas([]byte) uint64 {
 }
 
 func (EcOperations) Run(input []byte) ([]byte, error) {
-	if len(input) < 1 {
+	const MinLength = 1 + 32 + 32 // 1 for operation, 32 for the curve, 32 bytes for a scalar
+	if len(input) < MinLength {
 		return nil, fmt.Errorf("invalid length")
 	}
-	switch input[0] {
-	case 0x10:
-		return (&EcMultiply{}).Run(input[1:]) //	EcMul = 0x10
-	case 0x11:
-		return (&EcAdd{}).Run(input[1:]) //  EcAdd = 0x11
-	case 0x12:
-		return (&EcNeg{}).Run(input[1:]) //	EcNeg = 0x12
-	case 0x13:
-		return (&EcEqual{}).Run(input[1:]) //	EcEqual = 0x13
-	case 0x14:
-		return (&EcIsInfinity{}).Run(input[1:]) //	EcIsInfinity = 0x14
-	case 0x15:
-		return (&EcIsValid{}).Run(input[1:]) //	EcIsValid = 0x15
-	case 0x16:
-		return (&EcHash{}).Run(input[1:]) //	EcHash = 0x16
-	case 0x17:
-		return (&EcSumOfProducts{}).Run(input[1:]) //	EcSumOfProducts = 0x17
-	case 0x18:
-		return (&EcPairing{}).Run(input[1:]) //	EcPairing = 0x18
-	case 0x30:
-		return (&ScAdd{}).Run(input[1:]) //	ScAdd = 0x30
-	case 0x31:
-		return (&ScMul{}).Run(input[1:]) //	ScMul = 0x31
-	case 0x32:
-		return (&ScNeg{}).Run(input[1:]) //	ScNeg = 0x32
-	case 0x33:
-		return (&ScInv{}).Run(input[1:]) //	ScInvert = 0x33
-	case 0x34:
-		return (&ScSqrt{}).Run(input[1:]) //	ScSqrt = 0x34
-	case 0x35:
-		return (&ScEqual{}).Run(input[1:]) //	ScEqual = 0x35
-	case 0x36:
-		return (&ScIsZero{}).Run(input[1:]) //	ScIsZero = 0x36
-	case 0x37:
-		return (&ScIsValid{}).Run(input[1:]) //	ScIsValid = 0x37
-	case 0x38:
-		return (&ScFromWideBytes{}).Run(input[1:]) //	ScFromWideBytes = 0x38
-	case 0x39:
-		return (&ScHash{}).Run(input[1:]) //	ScHash = 0x39
-	case 0x50:
-		return (&EcdsaVerify{}).Run(input[1:]) //	EcdsaVerify = 0x50
-	case 0x51:
-		return (&SchnorrVerify1{}).Run(input[1:]) //	SchnorrVerify1 = 0x51
-	case 0x52:
-		return (&SchnorrVerify2{}).Run(input[1:]) //	SchnorrVerify2 = 0x52
-	case 0x53:
-		return (&BlsVerify{}).Run(input[1:]) //	BlsVerify = 0x53
-	default:
-		return nil, fmt.Errorf("invalid operation")
+	i := 0
+
+	for l := len(input); i < l; i++ {
+		switch input[i] {
+		case 0x10:
+			return (&EcMultiply{}).Run(input[i+1:]) //	EcMul = 0x10
+		case 0x11:
+			return (&EcAdd{}).Run(input[i+1:]) //  EcAdd = 0x11
+		case 0x12:
+			return (&EcNeg{}).Run(input[i+1:]) //	EcNeg = 0x12
+		case 0x13:
+			return (&EcEqual{}).Run(input[i+1:]) //	EcEqual = 0x13
+		case 0x14:
+			return (&EcIsInfinity{}).Run(input[i+1:]) //	EcIsInfinity = 0x14
+		case 0x15:
+			return (&EcIsValid{}).Run(input[i+1:]) //	EcIsValid = 0x15
+		case 0x16:
+			return (&EcHash{}).Run(input[i+1:]) //	EcHash = 0x16
+		case 0x17:
+			return (&EcSumOfProducts{}).Run(input[i+1:]) //	EcSumOfProducts = 0x17
+		case 0x18:
+			return (&EcPairing{}).Run(input[i+1:]) //	EcPairing = 0x18
+		case 0x30:
+			return (&ScAdd{}).Run(input[i+1:]) //	ScAdd = 0x30
+		case 0x31:
+			return (&ScMul{}).Run(input[i+1:]) //	ScMul = 0x31
+		case 0x32:
+			return (&ScNeg{}).Run(input[i+1:]) //	ScNeg = 0x32
+		case 0x33:
+			return (&ScInv{}).Run(input[i+1:]) //	ScInvert = 0x33
+		case 0x34:
+			return (&ScSqrt{}).Run(input[i+1:]) //	ScSqrt = 0x34
+		case 0x35:
+			return (&ScEqual{}).Run(input[i+1:]) //	ScEqual = 0x35
+		case 0x36:
+			return (&ScIsZero{}).Run(input[i+1:]) //	ScIsZero = 0x36
+		case 0x37:
+			return (&ScIsValid{}).Run(input[i+1:]) //	ScIsValid = 0x37
+		case 0x38:
+			return (&ScFromWideBytes{}).Run(input[i+1:]) //	ScFromWideBytes = 0x38
+		case 0x39:
+			return (&ScHash{}).Run(input[i+1:]) //	ScHash = 0x39
+		case 0x50:
+			return (&EcdsaVerify{}).Run(input[i+1:]) //	EcdsaVerify = 0x50
+		case 0x51:
+			return (&SchnorrVerify1{}).Run(input[i+1:]) //	SchnorrVerify1 = 0x51
+		case 0x52:
+			return (&SchnorrVerify2{}).Run(input[i+1:]) //	SchnorrVerify2 = 0x52
+		case 0x53:
+			return (&BlsVerify{}).Run(input[i+1:]) //	BlsVerify = 0x53
+		default:
+		}
 	}
+	return nil, fmt.Errorf("invalid operation")
 }
 
 type EcOps interface {
