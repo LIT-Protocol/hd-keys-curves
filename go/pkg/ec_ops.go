@@ -1224,6 +1224,7 @@ func (e *SchnorrVerify1) Run(input []byte) ([]byte, error) {
 }
 
 func (*SchnorrVerify1) Handle(processor curveHandler, input []byte) ([]byte, error) {
+	var r []byte
 	hasher, err := parseHash(input)
 	if err != nil {
 		return nil, err
@@ -1243,12 +1244,24 @@ func (*SchnorrVerify1) Handle(processor curveHandler, input []byte) ([]byte, err
 	if points[0].IsIdentity() {
 		return nil, fmt.Errorf("invalid public key")
 	}
+	pk := points[0]
 	offset := 64 + read
-	r := input[offset : offset+processor.SchnorrPointSize()]
-	if isAllZeros(r) {
-		return nil, fmt.Errorf("invalid signature")
+	read, points, err = processor.InPoint(input[offset:], 1)
+
+	if err != nil {
+		r = input[offset : offset+processor.SchnorrPointSize()]
+		if isAllZeros(r) {
+			return nil, fmt.Errorf("invalid signature")
+		}
+		offset += processor.SchnorrPointSize()
+	} else {
+		if points[0].IsIdentity() {
+			return nil, fmt.Errorf("invalid signature")
+		}
+		r = points[0].ToAffineCompressed()
+		offset += read
 	}
-	offset += processor.SchnorrPointSize()
+
 	sigScalar, err := processor.InScalar(input[offset:], 1)
 	if err != nil {
 		return nil, err
@@ -1258,12 +1271,15 @@ func (*SchnorrVerify1) Handle(processor curveHandler, input []byte) ([]byte, err
 	}
 	curve := processor.Curve()
 
-	eInt := new(big.Int).SetBytes(hasher.computeChallenge(r, processor.SchnorrPoint(points[0]), msg))
-	e, err := curve.NewScalar().SetBigInt(eInt)
+	eBytes := hasher.computeChallenge(r, processor.SchnorrPoint(pk), msg)
+	eWideBytes := make([]byte, len(eBytes)*2)
+	copy(eWideBytes[len(eBytes):], eBytes)
+
+	e, err := curve.NewScalar().SetBytesWide(eWideBytes)
 	if err != nil {
 		return nil, err
 	}
-	bigR := curve.ScalarBaseMult(sigScalar[0]).Sub(points[0].Mul(e))
+	bigR := curve.ScalarBaseMult(sigScalar[0]).Sub(pk.Mul(e))
 	rBytes := processor.SchnorrPoint(bigR)
 	if bigR.IsIdentity() || bytes.Compare(rBytes, r) != 0 {
 		return []byte{0}, nil
@@ -1285,6 +1301,7 @@ func (e *SchnorrVerify2) Run(input []byte) ([]byte, error) {
 }
 
 func (*SchnorrVerify2) Handle(processor curveHandler, input []byte) ([]byte, error) {
+	var r []byte
 	hasher, err := parseHash(input)
 	if err != nil {
 		return nil, err
@@ -1304,12 +1321,24 @@ func (*SchnorrVerify2) Handle(processor curveHandler, input []byte) ([]byte, err
 	if points[0].IsIdentity() {
 		return nil, fmt.Errorf("invalid public key")
 	}
+	pk := points[0]
 	offset := 64 + read
-	r := input[offset : offset+processor.SchnorrPointSize()]
-	if isAllZeros(r) {
-		return nil, fmt.Errorf("invalid signature")
+
+	read, points, err = processor.InPoint(input[offset:], 1)
+
+	if err != nil {
+		r = input[offset : offset+processor.SchnorrPointSize()]
+		if isAllZeros(r) {
+			return nil, fmt.Errorf("invalid signature")
+		}
+		offset += processor.SchnorrPointSize()
+	} else {
+		if points[0].IsIdentity() {
+			return nil, fmt.Errorf("invalid signature")
+		}
+		r = points[0].ToAffineCompressed()
+		offset += read
 	}
-	offset += processor.SchnorrPointSize()
 	sigScalar, err := processor.InScalar(input[offset:], 1)
 	if err != nil {
 		return nil, err
@@ -1319,12 +1348,15 @@ func (*SchnorrVerify2) Handle(processor curveHandler, input []byte) ([]byte, err
 	}
 	curve := processor.Curve()
 
-	eInt := new(big.Int).SetBytes(hasher.computeChallenge(r, processor.SchnorrPoint(points[0]), msg))
-	e, err := curve.NewScalar().SetBigInt(eInt)
+	eBytes := hasher.computeChallenge(r, processor.SchnorrPoint(pk), msg)
+	eWideBytes := make([]byte, len(eBytes)*2)
+	copy(eWideBytes[len(eBytes):], eBytes)
+
+	e, err := curve.NewScalar().SetBytesWide(eWideBytes)
 	if err != nil {
 		return nil, err
 	}
-	bigR := curve.ScalarBaseMult(sigScalar[0]).Add(points[0].Mul(e))
+	bigR := curve.ScalarBaseMult(sigScalar[0]).Add(pk.Mul(e))
 	rBytes := processor.SchnorrPoint(bigR)
 	if bigR.IsIdentity() || bytes.Compare(rBytes, r) != 0 {
 		return []byte{0}, nil
