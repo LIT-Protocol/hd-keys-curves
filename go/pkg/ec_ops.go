@@ -18,6 +18,8 @@ var (
 		103, 128, 126, 182, 145, 99, 7, 164, 226, 112, 30}
 	curveNamePrime256v1 = []byte{236, 151, 14, 250, 71, 58, 162, 250, 152, 240, 56, 58, 218, 26, 64, 52, 15, 149, 88, 58, 236,
 		119, 101, 93, 71, 74, 121, 18, 49, 68, 120, 167}
+	curveNameSecp384r1 = []byte{186, 177, 41, 47, 70, 175, 220, 252, 148, 37, 181, 41, 191, 16, 142, 88, 170, 179, 147, 33,
+		237, 86, 1, 244, 50, 172, 231, 197, 128, 13, 102, 124}
 	curveNameCurve25519 = []byte{95, 235, 190, 179, 75, 175, 72, 27, 200, 83, 4, 244, 249, 232, 242, 193, 145, 139, 223, 192,
 		16, 239, 86, 182, 149, 122, 201, 43, 169, 112, 141, 196}
 	curveNameBls12381g1 = []byte{157, 137, 108, 202, 42, 239, 133, 106, 124, 17, 78, 140, 254, 165, 166, 3, 68, 236, 72, 237,
@@ -56,6 +58,8 @@ func parseCurve(input []byte) (processor curveHandler, err error) {
 		processor = new(k256Processor)
 	} else if bytes.Compare(curve, curveNamePrime256v1) == 0 {
 		processor = new(p256Processor)
+	} else if bytes.Compare(curve, curveNameSecp384r1) == 0 {
+		processor = new(p384Processor)
 	} else if bytes.Compare(curve, curveNameCurve25519) == 0 {
 		processor = new(curve25519Processor)
 	} else if bytes.Compare(curve, curveNameBls12381g1) == 0 {
@@ -98,26 +102,27 @@ func parseHash(input []byte) (hasher schnorrChallenge, err error) {
 	return hasher, err
 }
 
-func inScalar(curve *curvey.Curve, input []byte, count int) ([]curvey.Scalar, error) {
-	if len(input) < 32*count {
-		return nil, fmt.Errorf("invalid length")
+func inScalar(curve *curvey.Curve, input []byte, size, count int) (int, []curvey.Scalar, error) {
+	if len(input) < size*count {
+		return 0, nil, fmt.Errorf("invalid length")
 	}
 	scalars := make([]curvey.Scalar, count)
 	for i := 0; i < count; i++ {
-		s, err := curve.NewScalar().SetBytes(input[32*i : 32*(i+1)])
+		s, err := curve.NewScalar().SetBytes(input[size*i : size*(i+1)])
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 		scalars[i] = s
 	}
-	return scalars, nil
+	return size * count, scalars, nil
 }
 
 type curveHandler interface {
 	InPoint(input []byte, count int) (int, []curvey.Point, error)
-	InScalar(input []byte, count int) ([]curvey.Scalar, error)
+	InScalar(input []byte, count int) (int, []curvey.Scalar, error)
 	OutPoint(point curvey.Point) []byte
 	PointSize() int
+	ScalarSize() int
 	Curve() *curvey.Curve
 	SchnorrPoint(point curvey.Point) []byte
 	SchnorrPointSize() int
@@ -145,8 +150,8 @@ func (*k256Processor) InPoint(input []byte, count int) (int, []curvey.Point, err
 	return 64 * count, points, nil
 }
 
-func (*k256Processor) InScalar(input []byte, count int) ([]curvey.Scalar, error) {
-	return inScalar(curvey.K256(), input, count)
+func (*k256Processor) InScalar(input []byte, count int) (int, []curvey.Scalar, error) {
+	return inScalar(curvey.K256(), input, 32, count)
 }
 
 func (*k256Processor) OutPoint(point curvey.Point) []byte {
@@ -158,6 +163,10 @@ func (*k256Processor) OutPoint(point curvey.Point) []byte {
 
 func (*k256Processor) PointSize() int {
 	return 64
+}
+
+func (*k256Processor) ScalarSize() int {
+	return 32
 }
 
 func (*k256Processor) Curve() *curvey.Curve {
@@ -197,8 +206,8 @@ func (*p256Processor) InPoint(input []byte, count int) (int, []curvey.Point, err
 	return 64 * count, points, nil
 }
 
-func (*p256Processor) InScalar(input []byte, count int) ([]curvey.Scalar, error) {
-	return inScalar(curvey.P256(), input, count)
+func (*p256Processor) InScalar(input []byte, count int) (int, []curvey.Scalar, error) {
+	return inScalar(curvey.P256(), input, 32, count)
 }
 
 func (*p256Processor) OutPoint(point curvey.Point) []byte {
@@ -210,6 +219,10 @@ func (*p256Processor) OutPoint(point curvey.Point) []byte {
 
 func (*p256Processor) PointSize() int {
 	return 64
+}
+
+func (*p256Processor) ScalarSize() int {
+	return 32
 }
 
 func (*p256Processor) Curve() *curvey.Curve {
@@ -225,6 +238,62 @@ func (*p256Processor) SchnorrPointSize() int {
 }
 
 func (*p256Processor) BlsVerify(msg, input []byte) error {
+	return fmt.Errorf("not supported")
+}
+
+type p384Processor struct{}
+
+func (*p384Processor) InPoint(input []byte, count int) (int, []curvey.Point, error) {
+	var buf [97]byte
+	if len(input) < 96*count {
+		return 0, nil, fmt.Errorf("invalid length")
+	}
+	buf[0] = 4
+	points := make([]curvey.Point, count)
+	curve := curvey.P384()
+	for i := 0; i < count; i++ {
+		copy(buf[1:], input[96*i:96*(i+1)])
+		pt, err := curve.NewIdentityPoint().FromAffineUncompressed(buf[:])
+		if err != nil {
+			return 0, nil, err
+		}
+		points[i] = pt
+	}
+	return 96 * count, points, nil
+}
+
+func (*p384Processor) InScalar(input []byte, count int) (int, []curvey.Scalar, error) {
+	return inScalar(curvey.P384(), input, 48, count)
+}
+
+func (*p384Processor) OutPoint(point curvey.Point) []byte {
+	if point == nil {
+		return []byte{}
+	}
+	return point.ToAffineUncompressed()[1:]
+}
+
+func (*p384Processor) PointSize() int {
+	return 96
+}
+
+func (*p384Processor) ScalarSize() int {
+	return 48
+}
+
+func (*p384Processor) Curve() *curvey.Curve {
+	return curvey.P384()
+}
+
+func (*p384Processor) SchnorrPoint(point curvey.Point) []byte {
+	return point.ToAffineCompressed()[1:]
+}
+
+func (*p384Processor) SchnorrPointSize() int {
+	return 32
+}
+
+func (*p384Processor) BlsVerify(msg, input []byte) error {
 	return fmt.Errorf("not supported")
 }
 
@@ -246,8 +315,8 @@ func (*curve25519Processor) InPoint(input []byte, count int) (int, []curvey.Poin
 	return 64 * count, points, nil
 }
 
-func (*curve25519Processor) InScalar(input []byte, count int) ([]curvey.Scalar, error) {
-	return inScalar(curvey.ED25519(), input, count)
+func (*curve25519Processor) InScalar(input []byte, count int) (int, []curvey.Scalar, error) {
+	return inScalar(curvey.ED25519(), input, 32, count)
 }
 
 func (*curve25519Processor) OutPoint(point curvey.Point) []byte {
@@ -261,6 +330,10 @@ func (*curve25519Processor) OutPoint(point curvey.Point) []byte {
 
 func (*curve25519Processor) PointSize() int {
 	return 64
+}
+
+func (*curve25519Processor) ScalarSize() int {
+	return 32
 }
 
 func (*curve25519Processor) Curve() *curvey.Curve {
@@ -297,8 +370,8 @@ func (*bls12381g1Processor) InPoint(input []byte, count int) (int, []curvey.Poin
 	return 96 * count, points, nil
 }
 
-func (*bls12381g1Processor) InScalar(input []byte, count int) ([]curvey.Scalar, error) {
-	return inScalar(curvey.BLS12381G1(), input, count)
+func (*bls12381g1Processor) InScalar(input []byte, count int) (int, []curvey.Scalar, error) {
+	return inScalar(curvey.BLS12381G1(), input, 32, count)
 }
 
 func (*bls12381g1Processor) OutPoint(point curvey.Point) []byte {
@@ -310,6 +383,10 @@ func (*bls12381g1Processor) OutPoint(point curvey.Point) []byte {
 
 func (*bls12381g1Processor) PointSize() int {
 	return 96
+}
+
+func (*bls12381g1Processor) ScalarSize() int {
+	return 32
 }
 
 func (*bls12381g1Processor) Curve() *curvey.Curve {
@@ -374,8 +451,8 @@ func (*bls12381g2Processor) InPoint(input []byte, count int) (int, []curvey.Poin
 	return 192 * count, points, nil
 }
 
-func (*bls12381g2Processor) InScalar(input []byte, count int) ([]curvey.Scalar, error) {
-	return inScalar(curvey.BLS12381G2(), input, count)
+func (*bls12381g2Processor) InScalar(input []byte, count int) (int, []curvey.Scalar, error) {
+	return inScalar(curvey.BLS12381G2(), input, 32, count)
 }
 
 func (*bls12381g2Processor) OutPoint(point curvey.Point) []byte {
@@ -387,6 +464,10 @@ func (*bls12381g2Processor) OutPoint(point curvey.Point) []byte {
 
 func (*bls12381g2Processor) PointSize() int {
 	return 192
+}
+
+func (*bls12381g2Processor) ScalarSize() int {
+	return 32
 }
 
 func (*bls12381g2Processor) Curve() *curvey.Curve {
@@ -450,8 +531,8 @@ func (*bls12381gtProcessor) InPoint(input []byte, count int) (int, []curvey.Poin
 	return 576 * count, points, nil
 }
 
-func (*bls12381gtProcessor) InScalar(input []byte, count int) ([]curvey.Scalar, error) {
-	return inScalar(curvey.BLS12381G2(), input, count)
+func (*bls12381gtProcessor) InScalar(input []byte, count int) (int, []curvey.Scalar, error) {
+	return inScalar(curvey.BLS12381G2(), input, 32, count)
 }
 
 func (*bls12381gtProcessor) OutPoint(point curvey.Point) []byte {
@@ -463,6 +544,10 @@ func (*bls12381gtProcessor) OutPoint(point curvey.Point) []byte {
 
 func (*bls12381gtProcessor) PointSize() int {
 	return 576
+}
+
+func (*bls12381gtProcessor) ScalarSize() int {
+	return 32
 }
 
 func (*bls12381gtProcessor) Curve() *curvey.Curve {
@@ -642,7 +727,7 @@ func (*EcMultiply) Handle(processor curveHandler, input []byte) (res []byte, err
 	if len(points) < 1 {
 		return nil, fmt.Errorf("insufficient points, expected 1 but got 0")
 	}
-	scalars, err = processor.InScalar(input[read:], 1)
+	_, scalars, err = processor.InScalar(input[read:], 1)
 	if err != nil {
 		return nil, err
 	}
@@ -654,7 +739,7 @@ func (*EcMultiply) Handle(processor curveHandler, input []byte) (res []byte, err
 }
 
 func (*EcMultiply) MinLength(processor curveHandler) int {
-	return processor.PointSize() + scalarSize
+	return processor.PointSize() + processor.ScalarSize()
 }
 
 func (*EcAdd) RequiredGas([]byte) uint64 {
@@ -828,7 +913,7 @@ func (*EcSumOfProducts) Handle(processor curveHandler, input []byte) ([]byte, er
 	if len(points) < ll {
 		return nil, fmt.Errorf("insufficient points, expected %d but got %d", ll, len(points))
 	}
-	scalars, err := processor.InScalar(input[read+32:], ll)
+	_, scalars, err := processor.InScalar(input[read+32:], ll)
 	if err != nil {
 		return nil, err
 	}
@@ -894,7 +979,7 @@ func (s *ScAdd) Run(input []byte) ([]byte, error) {
 }
 
 func (*ScAdd) Handle(processor curveHandler, input []byte) ([]byte, error) {
-	scalars, err := processor.InScalar(input, 2)
+	_, scalars, err := processor.InScalar(input, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -921,7 +1006,7 @@ func (s *ScMul) Run(input []byte) ([]byte, error) {
 }
 
 func (*ScMul) Handle(processor curveHandler, input []byte) ([]byte, error) {
-	scalars, err := processor.InScalar(input, 2)
+	_, scalars, err := processor.InScalar(input, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -948,7 +1033,7 @@ func (s *ScNeg) Run(input []byte) ([]byte, error) {
 }
 
 func (*ScNeg) Handle(processor curveHandler, input []byte) ([]byte, error) {
-	scalars, err := processor.InScalar(input, 1)
+	_, scalars, err := processor.InScalar(input, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -975,7 +1060,7 @@ func (s *ScInv) Run(input []byte) ([]byte, error) {
 }
 
 func (*ScInv) Handle(processor curveHandler, input []byte) ([]byte, error) {
-	scalars, err := processor.InScalar(input, 1)
+	_, scalars, err := processor.InScalar(input, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -1005,7 +1090,7 @@ func (s *ScSqrt) Run(input []byte) ([]byte, error) {
 }
 
 func (*ScSqrt) Handle(processor curveHandler, input []byte) ([]byte, error) {
-	scalars, err := processor.InScalar(input, 1)
+	_, scalars, err := processor.InScalar(input, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -1035,7 +1120,7 @@ func (s *ScEqual) Run(input []byte) ([]byte, error) {
 }
 
 func (*ScEqual) Handle(processor curveHandler, input []byte) ([]byte, error) {
-	scalars, err := processor.InScalar(input, 2)
+	_, scalars, err := processor.InScalar(input, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -1062,7 +1147,7 @@ func (s *ScIsZero) Run(input []byte) ([]byte, error) {
 }
 
 func (*ScIsZero) Handle(processor curveHandler, input []byte) ([]byte, error) {
-	scalars, err := processor.InScalar(input, 1)
+	_, scalars, err := processor.InScalar(input, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -1089,7 +1174,7 @@ func (s *ScIsValid) Run(input []byte) ([]byte, error) {
 }
 
 func (*ScIsValid) Handle(processor curveHandler, input []byte) ([]byte, error) {
-	scalars, err := processor.InScalar(input, 1)
+	_, scalars, err := processor.InScalar(input, 1)
 	if err != nil {
 		return []byte{0}, nil
 	}
@@ -1162,14 +1247,13 @@ func (e *EcdsaVerify) Run(input []byte) ([]byte, error) {
 }
 
 func (*EcdsaVerify) Handle(processor curveHandler, input []byte) ([]byte, error) {
-	messageScalar, err := processor.InScalar(input, 1)
+	curve := processor.Curve()
+	msg := new(big.Int).SetBytes(input[:processor.ScalarSize()])
+	messageScalar, err := curve.NewScalar().SetBigInt(msg)
 	if err != nil {
 		return nil, err
 	}
-	if len(messageScalar) != 1 {
-		return nil, fmt.Errorf("insufficient scalars, expected 1 but got %d", len(messageScalar))
-	}
-	read, points, err := processor.InPoint(input[32:], 1)
+	read2, points, err := processor.InPoint(input[processor.ScalarSize():], 1)
 	if err != nil {
 		return nil, err
 	}
@@ -1179,11 +1263,11 @@ func (*EcdsaVerify) Handle(processor curveHandler, input []byte) ([]byte, error)
 	if points[0].IsIdentity() {
 		return nil, fmt.Errorf("invalid public key")
 	}
-	if len(input[32+read:]) < 64 {
+	if len(input[processor.ScalarSize()+read2:]) < 2*processor.ScalarSize() {
 		return nil, fmt.Errorf("invalid length")
 	}
 	// r, s
-	sigScalars, err := processor.InScalar(input[64+read:], 2)
+	_, sigScalars, err := processor.InScalar(input[processor.ScalarSize()+read2:], 2)
 	if err != nil {
 		return nil, err
 	}
@@ -1196,9 +1280,8 @@ func (*EcdsaVerify) Handle(processor curveHandler, input []byte) ([]byte, error)
 		// only returns an error if `s` is zero
 		return nil, fmt.Errorf("invalid signature")
 	}
-	u1 := messageScalar[0].Mul(sInv)
+	u1 := messageScalar.Mul(sInv)
 	u2 := sigScalars[0].Mul(sInv)
-	curve := processor.Curve()
 	p := curve.ScalarBaseMult(u1).Add(points[0].Mul(u2))
 	x := new(big.Int).SetBytes(p.ToAffineCompressed()[1:])
 	// reduces bytes
@@ -1232,9 +1315,9 @@ func (*SchnorrVerify1) Handle(processor curveHandler, input []byte) ([]byte, err
 	if len(input[32:]) < 32 {
 		return nil, fmt.Errorf("invalid length")
 	}
-	msg := input[32:64]
+	msg := input[32 : 32+processor.ScalarSize()]
 
-	read, points, err := processor.InPoint(input[64:], 1)
+	read, points, err := processor.InPoint(input[32+len(msg):], 1)
 	if err != nil {
 		return nil, err
 	}
@@ -1245,7 +1328,7 @@ func (*SchnorrVerify1) Handle(processor curveHandler, input []byte) ([]byte, err
 		return nil, fmt.Errorf("invalid public key")
 	}
 	pk := points[0]
-	offset := 64 + read
+	offset := 32 + len(msg) + read
 	read, points, err = processor.InPoint(input[offset:], 1)
 
 	if err != nil {
@@ -1262,7 +1345,7 @@ func (*SchnorrVerify1) Handle(processor curveHandler, input []byte) ([]byte, err
 		offset += read
 	}
 
-	sigScalar, err := processor.InScalar(input[offset:], 1)
+	_, sigScalar, err := processor.InScalar(input[offset:], 1)
 	if err != nil {
 		return nil, err
 	}
@@ -1306,12 +1389,12 @@ func (*SchnorrVerify2) Handle(processor curveHandler, input []byte) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	if len(input[32:]) < 32 {
+	if len(input[32:]) < processor.ScalarSize() {
 		return nil, fmt.Errorf("invalid length")
 	}
-	msg := input[32:64]
+	msg := input[32 : 32+processor.ScalarSize()]
 
-	read, points, err := processor.InPoint(input[64:], 1)
+	read, points, err := processor.InPoint(input[32+len(msg):], 1)
 	if err != nil {
 		return nil, err
 	}
@@ -1322,7 +1405,7 @@ func (*SchnorrVerify2) Handle(processor curveHandler, input []byte) ([]byte, err
 		return nil, fmt.Errorf("invalid public key")
 	}
 	pk := points[0]
-	offset := 64 + read
+	offset := 32 + len(msg) + read
 
 	read, points, err = processor.InPoint(input[offset:], 1)
 
@@ -1339,7 +1422,7 @@ func (*SchnorrVerify2) Handle(processor curveHandler, input []byte) ([]byte, err
 		r = points[0].ToAffineCompressed()
 		offset += read
 	}
-	sigScalar, err := processor.InScalar(input[offset:], 1)
+	_, sigScalar, err := processor.InScalar(input[offset:], 1)
 	if err != nil {
 		return nil, err
 	}
