@@ -27,6 +27,6 @@ contract TestECOps is Test {
         assertEq(success, true);
         console.logString("isValid: ");
         console.logBytes(isValid);
-        assertEq(isValid, bytes("0x01"));
+        assertEq(isValid, bytes(hex"01"));
     }
 }
