@@ -3,7 +3,7 @@ module github.com/LIT-Protocol/hd-keys-ecdsa/go
 go 1.20
 
 require (
-	github.com/mikelodder7/curvey v1.0.2
+	github.com/mikelodder7/curvey v1.1.1
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/crypto v0.14.0
 )
