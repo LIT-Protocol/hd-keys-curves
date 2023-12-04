@@ -13,8 +13,8 @@
   },
   "files": {
     "contracts/HDKeyDeriver.sol": {
-      "lastModificationDate": 1700671365650,
-      "contentHash": "8b5f9867d6a0a5151bfa68acd764f63b",
+      "lastModificationDate": 1701718939396,
+      "contentHash": "439ec72f1bfad10f5b4914fd1d6f0339",
       "sourceName": "contracts/HDKeyDeriver.sol",
       "solcConfig": {
         "settings": {
@@ -1040,8 +1040,8 @@
       }
     },
     "test/TestHDKeyDeriver.sol": {
-      "lastModificationDate": 1700671904846,
-      "contentHash": "c2cbbec576954cc3ba1de6b274d3c2bd",
+      "lastModificationDate": 1701719181577,
+      "contentHash": "ca660cfe8efdf1fc2fe32edcb5622254",
       "sourceName": "test/TestHDKeyDeriver.sol",
       "solcConfig": {
         "settings": {
@@ -1074,6 +1074,26 @@
       },
       "imports": [
         "contracts/HDKeyDeriver.sol",
+        "lib/forge-std/lib/ds-test/src/test.sol",
+        "lib/forge-std/src/Base.sol",
+        "lib/forge-std/src/StdAssertions.sol",
+        "lib/forge-std/src/StdChains.sol",
+        "lib/forge-std/src/StdCheats.sol",
+        "lib/forge-std/src/StdError.sol",
+        "lib/forge-std/src/StdInvariant.sol",
+        "lib/forge-std/src/StdJson.sol",
+        "lib/forge-std/src/StdMath.sol",
+        "lib/forge-std/src/StdStorage.sol",
+        "lib/forge-std/src/StdStyle.sol",
+        "lib/forge-std/src/StdUtils.sol",
+        "lib/forge-std/src/Test.sol",
+        "lib/forge-std/src/Vm.sol",
+        "lib/forge-std/src/console.sol",
+        "lib/forge-std/src/console2.sol",
+        "lib/forge-std/src/interfaces/IMulticall3.sol",
+        "lib/forge-std/src/mocks/MockERC20.sol",
+        "lib/forge-std/src/mocks/MockERC721.sol",
+        "lib/forge-std/src/safeconsole.sol",
         "node_modules/solidity-bytes-utils/contracts/BytesLib.sol"
       ],
       "versionRequirement": null,

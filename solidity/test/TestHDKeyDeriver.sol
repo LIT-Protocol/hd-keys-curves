@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import "../contracts/HDKeyDeriver.sol";
+import "forge-std/console.sol";
+import "forge-std/Test.sol";
 
-contract HDKeyDeriverTest is KeyDeriver {
+contract HDKeyDeriverTest is KeyDeriver, Test {
     struct RootKey {
         bytes pubkey;
         uint256 keyType; // 1 = BLS, 2 = ECDSA.  Not doing this in an enum so we can add more keytypes in the future without redeploying.
     }
 
-    function testHDKeyDerive() public view returns (bytes memory) {
+    function testHDKeyDerive() public returns (bytes memory) {
         bytes[] memory pubkeys = new bytes[](2);
 
         pubkeys[
@@ -23,6 +25,15 @@ contract HDKeyDeriverTest is KeyDeriver {
         if (!result) {
             revert("result was false, error while generating pubkey");
         }
+
+        console.logString("pubkey: ");
+        console.logBytes(pubkey);
+        assertEq(pubkey.length, 65);
+        assertEq(pubkey[0], hex"04");
+        assertEq(
+            pubkey,
+            hex"04dd4bcde9098cf1f26613af620ff11e5c51100cf2dafa80f3d8441bd42f8ce6b8e2d4119b95400c50dcbe6e0552ab44ae865cc39278ac8d7e2573bc45ad1941de"
+        );
 
         return pubkey;
     }
