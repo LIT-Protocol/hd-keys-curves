@@ -7,7 +7,7 @@ abstract contract KeyDeriver {
     using BytesLib for bytes;
 
     // address for HD public KDF
-    address public constant HD_KDF = 0x0000000000000000000000000000000000000100;
+    address public constant HD_KDF = 0x00000000000000000000000000000000000000F5;
     // hd kdf ctx
     string constant HD_KDF_CTX = "LIT_HD_KEY_ID_K256_XMD:SHA-256_SSWU_RO_NUL_";
 
