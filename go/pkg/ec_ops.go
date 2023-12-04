@@ -567,19 +567,14 @@ func (*bls12381gtProcessor) BlsVerify(msg, input []byte) error {
 }
 
 func executeCommand(ops EcOps, input []byte) (res []byte, err error) {
-	var processor curveHandler
-	var e error
-	i := 0
-	for l := len(input); i < l; i++ {
-		processor, e = parseCurve(input[i:])
-		if e == nil {
-			break
-		}
+	processor, e := parseCurve(input[:])
+	if e != nil {
+		return nil, e
 	}
-	if len(input[i+32:]) < ops.MinLength(processor) {
+	if len(input[32:]) < ops.MinLength(processor) {
 		return nil, fmt.Errorf("invalid length")
 	}
-	return ops.Handle(processor, input[i+32:])
+	return ops.Handle(processor, input[32:])
 }
 
 type schnorrChallenge interface {
