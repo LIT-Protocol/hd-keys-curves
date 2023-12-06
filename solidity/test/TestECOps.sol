@@ -5,7 +5,7 @@ import "forge-std/console.sol";
 
 contract TestECOps is Test {
     address public constant BASE_EC_OP_ADDRESS =
-        0x000000000000000000000000000000000000012c;
+        0x000000000000000000000000000000000000012D;
 
     function testPreCompile() public {
         // proof taken from here https://github.com/LIT-Protocol/hd-keys-ecdsa/blob/main/go/pkg/ec_ops_test.go#L113

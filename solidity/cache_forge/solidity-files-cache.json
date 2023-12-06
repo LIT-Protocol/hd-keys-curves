@@ -978,8 +978,8 @@
       }
     },
     "test/TestECOps.sol": {
-      "lastModificationDate": 1701719685289,
-      "contentHash": "c9e8df0c3013cc5b15c2eaf4f8a13d25",
+      "lastModificationDate": 1701879979386,
+      "contentHash": "c33ab5c2afb670bb96302d2ba242cb0c",
       "sourceName": "test/TestECOps.sol",
       "solcConfig": {
         "settings": {
