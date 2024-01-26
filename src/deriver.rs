@@ -25,7 +25,8 @@ where
     use k256::elliptic_curve::group::{Curve, Group};
     let rerandomizer =
         compute_rerandomizer::<C>(verifying_key, pre_sig.big_r, message, associated_data, cxt)?;
-    let big_r = C::ProjectivePoint::from(pre_sig.big_r) + C::ProjectivePoint::generator() * rerandomizer;
+    let big_r =
+        C::ProjectivePoint::from(pre_sig.big_r) + C::ProjectivePoint::generator() * rerandomizer;
     Ok(PresignOutput {
         big_r: big_r.to_affine(),
         k: pre_sig.k + rerandomizer,

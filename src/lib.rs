@@ -8,10 +8,11 @@ use cait_sith::{CSCurve, KeygenOutput};
 use std::fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex};
 
 use crate::deriver::*;
-use k256::elliptic_curve::{
-    ScalarPrimitive,
-    hash2curve::{GroupDigest, FromOkm}, CurveArithmetic, Field, Group, PrimeField,
+use elliptic_curve::hash2curve::{ExpandMsg, ExpandMsgXmd, ExpandMsgXof, Expander};
+use elliptic_curve::{
     group::cofactor::CofactorGroup,
+    hash2curve::{FromOkm, GroupDigest},
+    CurveArithmetic, Field, Group, PrimeField, ScalarPrimitive,
 };
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +20,187 @@ pub use crate::deriver::compute_rerandomizer;
 #[cfg(feature = "cait-sith")]
 pub use crate::deriver::update_cait_sith_presig;
 
+pub trait HDDeriver: PrimeField {
+    fn create(msg: &[u8], dst: &[u8]) -> Self;
+
+    fn hd_derive_secret_key(&self, secret_keys: &[Self]) -> Self {
+        let mut result = Self::ZERO;
+        for v in secret_keys.iter().rev() {
+            result *= *self;
+            result += v;
+        }
+        result
+    }
+
+    fn hd_derive_public_key<D: HDDerivable<Scalar = Self>>(&self, public_keys: &[D]) -> D {
+        if public_keys.is_empty() {
+            return D::identity();
+        }
+        if public_keys.len() == 1 {
+            return public_keys[0] * *self;
+        }
+        let powers = get_poly_powers(*self, public_keys.len());
+        D::sum_of_products(public_keys, powers.as_slice())
+    }
+}
+
+pub trait HDDerivable: Group {
+    fn sum_of_products(points: &[Self], scalars: &[Self::Scalar]) -> Self;
+}
+
+impl HDDeriver for k256::Scalar {
+    fn create(msg: &[u8], dst: &[u8]) -> Self {
+        let msg = [msg];
+        let dst = [dst];
+        k256::Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha2::Sha256>>(&msg, &dst)
+            .expect("hash_to_scalar failed")
+    }
+}
+
+impl HDDerivable for k256::ProjectivePoint {
+    fn sum_of_products(points: &[Self], scalars: &[Self::Scalar]) -> Self {
+        sum_of_products_pippenger::<k256::Secp256k1>(points, scalars)
+    }
+}
+
+impl HDDeriver for p256::Scalar {
+    fn create(msg: &[u8], dst: &[u8]) -> Self {
+        let msg = [msg];
+        let dst = [dst];
+        p256::NistP256::hash_to_scalar::<ExpandMsgXmd<sha2::Sha256>>(&msg, &dst)
+            .expect("hash_to_scalar failed")
+    }
+}
+
+impl HDDerivable for p256::ProjectivePoint {
+    fn sum_of_products(points: &[Self], scalars: &[Self::Scalar]) -> Self {
+        sum_of_products_pippenger::<p256::NistP256>(points, scalars)
+    }
+}
+
+impl HDDeriver for p384::Scalar {
+    fn create(msg: &[u8], dst: &[u8]) -> Self {
+        let msg = [msg];
+        let dst = [dst];
+        p384::NistP384::hash_to_scalar::<ExpandMsgXmd<sha2::Sha384>>(&msg, &dst)
+            .expect("hash_to_scalar failed")
+    }
+}
+
+impl HDDerivable for p384::ProjectivePoint {
+    fn sum_of_products(points: &[Self], scalars: &[Self::Scalar]) -> Self {
+        points
+            .iter()
+            .zip(scalars.iter())
+            .fold(p384::ProjectivePoint::IDENTITY, |acc, (pt, sc)| {
+                acc + *pt * *sc
+            })
+    }
+}
+
+impl HDDeriver for ed448_goldilocks_plus::Scalar {
+    fn create(msg: &[u8], dst: &[u8]) -> Self {
+        ed448_goldilocks_plus::Scalar::hash::<ExpandMsgXof<sha3::Shake256>>(msg, dst)
+    }
+}
+
+impl HDDerivable for ed448_goldilocks_plus::EdwardsPoint {
+    fn sum_of_products(points: &[Self], scalars: &[Self::Scalar]) -> Self {
+        points.iter().zip(scalars.iter()).fold(
+            ed448_goldilocks_plus::EdwardsPoint::default(),
+            |acc, (pt, sc)| acc + *pt * *sc,
+        )
+    }
+}
+
+impl HDDeriver for vsss_rs::curve25519::WrappedScalar {
+    fn create(msg: &[u8], dst: &[u8]) -> Self {
+        let msg = [msg];
+        let dst = [dst];
+        let mut expander = ExpandMsgXmd::<sha2::Sha512>::expand_message(&msg, &dst, 64)
+            .expect("expand_message failed");
+        let mut okm = [0u8; 64];
+        expander.fill_bytes(&mut okm);
+        vsss_rs::curve25519::WrappedScalar(
+            vsss_rs::curve25519_dalek::Scalar::from_bytes_mod_order_wide(&okm),
+        )
+    }
+}
+
+impl HDDerivable for vsss_rs::curve25519::WrappedEdwards {
+    fn sum_of_products(points: &[Self], scalars: &[Self::Scalar]) -> Self {
+        points.iter().zip(scalars.iter()).fold(
+            vsss_rs::curve25519::WrappedEdwards::default(),
+            |acc, (pt, sc)| acc + *pt * *sc,
+        )
+    }
+}
+
+impl HDDerivable for vsss_rs::curve25519::WrappedRistretto {
+    fn sum_of_products(points: &[Self], scalars: &[Self::Scalar]) -> Self {
+        points.iter().zip(scalars.iter()).fold(
+            vsss_rs::curve25519::WrappedRistretto::default(),
+            |acc, (pt, sc)| acc + *pt * *sc,
+        )
+    }
+}
+
+impl HDDeriver for jubjub::Scalar {
+    fn create(msg: &[u8], dst: &[u8]) -> Self {
+        jubjub::Scalar::hash::<ExpandMsgXmd<blake2::Blake2b512>>(msg, dst)
+    }
+}
+
+impl HDDerivable for jubjub::ExtendedPoint {
+    fn sum_of_products(points: &[Self], scalars: &[Self::Scalar]) -> Self {
+        points
+            .iter()
+            .zip(scalars.iter())
+            .fold(jubjub::ExtendedPoint::default(), |acc, (pt, sc)| {
+                acc + *pt * *sc
+            })
+    }
+}
+
+impl HDDerivable for jubjub::SubgroupPoint {
+    fn sum_of_products(points: &[Self], scalars: &[Self::Scalar]) -> Self {
+        points
+            .iter()
+            .zip(scalars.iter())
+            .fold(jubjub::SubgroupPoint::default(), |acc, (pt, sc)| {
+                acc + *pt * *sc
+            })
+    }
+}
+
+impl HDDeriver for blsful::inner_types::Scalar {
+    fn create(msg: &[u8], dst: &[u8]) -> Self {
+        blsful::inner_types::Scalar::hash::<ExpandMsgXmd<sha2::Sha256>>(msg, dst)
+    }
+}
+
+impl HDDerivable for blsful::inner_types::G1Projective {
+    fn sum_of_products(points: &[Self], scalars: &[Self::Scalar]) -> Self {
+        blsful::inner_types::G1Projective::sum_of_products(points, scalars)
+    }
+}
+
+impl HDDerivable for blsful::inner_types::G2Projective {
+    fn sum_of_products(points: &[Self], scalars: &[Self::Scalar]) -> Self {
+        blsful::inner_types::G2Projective::sum_of_products(points, scalars)
+    }
+}
+
+fn get_poly_powers<D: HDDeriver>(scalar: D, count: usize) -> Vec<D> {
+    let mut powers = vec![<D as Field>::ONE; count];
+    powers[1] = scalar;
+    for i in 2..powers.len() {
+        powers[i] = powers[i - 1] * scalar;
+    }
+    powers
+}
+
+#[deprecated(since = "0.2.0", note = "Please use HDDeriver trait instead")]
 #[derive(Debug, Clone, Copy, Hash, Ord, PartialOrd, Eq, PartialEq, Deserialize, Serialize)]
 pub struct HdKeyDeriver<C>(C::Scalar)
 where
@@ -250,7 +432,7 @@ fn sum_of_products_pippenger<C: CurveArithmetic>(
 }
 
 #[cfg(target_pointer_width = "32")]
-fn convert_scalars<C: CurveArithmetic>(scalars: &[C::Scalar]) -> Vec<[u64; 4]> {
+fn convert_scalars<C: CurveArithmetic>(scalars: &[C::Scalar]) -> Vec<Vec<u64>> {
     scalars
         .iter()
         .map(|s| {
@@ -355,7 +537,7 @@ fn pippinger_p256_known() {
 }
 
 #[test]
-fn compute_secret_key() {
+fn compute_secret_key_test() {
     let mut rng = rand::thread_rng();
     let d0 = k256::Scalar::random(&mut rng);
     let d1 = k256::Scalar::random(&mut rng);
@@ -385,4 +567,61 @@ fn compute_secret_key() {
     let p = vsss_rs::combine_shares::<k256::Scalar, u8, Vec<u8>>(&shares).unwrap();
 
     assert_eq!(p, d0 + d1 * deriver.to_inner());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::*;
+
+    #[rstest]
+    #[case::k256(k256::Scalar::default(), k256::ProjectivePoint::default())]
+    #[case::p256(p256::Scalar::default(), p256::ProjectivePoint::default())]
+    #[case::p384(p384::Scalar::default(), p384::ProjectivePoint::default())]
+    #[case::ed25519(
+        vsss_rs::curve25519::WrappedScalar::default(),
+        vsss_rs::curve25519::WrappedEdwards::default()
+    )]
+    #[case::ristretto25519(
+        vsss_rs::curve25519::WrappedScalar::default(),
+        vsss_rs::curve25519::WrappedRistretto::default()
+    )]
+    #[case::jubjub(jubjub::Scalar::default(), jubjub::SubgroupPoint::default())]
+    #[case::ed448(
+        ed448_goldilocks_plus::Scalar::default(),
+        ed448_goldilocks_plus::EdwardsPoint::default()
+    )]
+    #[case::bls12_381_g1(
+        blsful::inner_types::Scalar::default(),
+        blsful::inner_types::G1Projective::default()
+    )]
+    #[case::bls12_381_g2(
+        blsful::inner_types::Scalar::default(),
+        blsful::inner_types::G2Projective::default()
+    )]
+    fn derive_test<D: HDDeriver, B: HDDerivable<Scalar = D>>(#[case] _d: D, #[case] _b: B) {
+        use rand::SeedableRng;
+
+        const DST: &[u8] = b"LIT_HD_KEY_ID_TEST_XMD_OR_XOF_RO_";
+
+        let mut rng = rand_xorshift::XorShiftRng::from_seed([6u8; 16]);
+        let deriver = D::create(b"id", DST);
+
+        let sks = [
+            D::random(&mut rng),
+            D::random(&mut rng),
+            D::random(&mut rng),
+        ];
+
+        let pks = [
+            B::generator() * sks[0],
+            B::generator() * sks[1],
+            B::generator() * sks[2],
+        ];
+
+        let new_sk = deriver.hd_derive_secret_key(&sks);
+        let expected_pk = B::generator() * new_sk;
+        let new_pk = deriver.hd_derive_public_key(&pks);
+        assert_eq!(expected_pk, new_pk);
+    }
 }

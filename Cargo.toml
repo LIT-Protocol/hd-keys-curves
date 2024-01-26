@@ -1,19 +1,30 @@
 [package]
 name = "hd-keys-ecdsa"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "Apache-2"
 
 [dependencies]
+blsful = "2.5"
+blake2 = "0.10"
+curve25519-dalek-ml = { version = "4.1.1", features = ["digest"] }
 cait-sith = { git = "https://github.com/LIT-Protocol/cait-sith.git", features = ["k256"], optional = true }
 digest = "0.10"
+ed448-goldilocks-plus = "0.11"
+elliptic-curve = { version = "0.13", features = ["arithmetic", "hash2curve"] }
+hex = "0.4"
+jubjub = { version = "0.10", git = "https://github.com/LIT-Protocol/jubjub.git" }
 k256 = { version = "0.13", features = ["ecdsa-core", "expose-field", "hash2curve", "sha256"] }
 p256 = { version = "0.13", features = ["ecdsa-core", "expose-field", "hash2curve", "sha256"] }
+p384 = { version = "0.13", features = ["ecdsa-core", "expose-field", "hash2curve", "sha384"] }
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
+sha3 = "0.10"
 thiserror = "1.0"
+vsss-rs = { version = "3.3", features = ["curve25519", "std"] }
 
 [dev-dependencies]
 digest = "0.10"
 rand = "0.8"
-vsss-rs = { version = "3.2", features = ["std"] }
+rand_xorshift = "0.3"
+rstest = "0.18"
