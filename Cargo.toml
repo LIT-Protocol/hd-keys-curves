@@ -1,5 +1,5 @@
 [package]
-name = "hd-keys-ecdsa"
+name = "hd-keys-curves"
 version = "0.2.0"
 edition = "2021"
 license = "Apache-2"
@@ -7,7 +7,7 @@ license = "Apache-2"
 [dependencies]
 blsful = "2.5"
 blake2 = "0.10"
-curve25519-dalek-ml = { version = "4.1.1", features = ["digest"] }
+curve25519-dalek-ml = { version = "4.1.1", features = ["digest", "group"] }
 cait-sith = { git = "https://github.com/LIT-Protocol/cait-sith.git", features = ["k256"], optional = true }
 digest = "0.10"
 ed448-goldilocks-plus = "0.11"
