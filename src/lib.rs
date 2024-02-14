@@ -462,7 +462,7 @@ fn sum_of_products_pippenger<C: CurveArithmetic>(
 }
 
 #[cfg(target_pointer_width = "32")]
-fn convert_scalars<C: CurveArithmetic>(scalars: &[C::Scalar]) -> Vec<Vec<u64>> {
+fn convert_scalars<C: CurveArithmetic>(scalars: &[C::Scalar]) -> Vec<[u64; 4]> {
     scalars
         .iter()
         .map(|s| {
