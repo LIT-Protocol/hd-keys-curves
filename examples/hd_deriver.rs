@@ -1,10 +1,10 @@
-use hd_keys_ecdsa::*;
 use k256::elliptic_curve::Field;
 use k256::*;
 use std::{
     io::{stdout, Write},
     time::SystemTime,
 };
+use hd_keys_curves::HdKeyDeriver;
 
 fn main() {
     const START: usize = 1000;
