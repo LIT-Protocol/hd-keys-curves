@@ -23,6 +23,9 @@ sha3 = "0.10"
 thiserror = "1.0"
 vsss-rs = { version = "4.0.1", features = ["curve25519", "std"] }
 
+[target.'cfg(target_pointer_width = "32")'.dependencies]
+getrandom = { version = "0.2.14", features = ["js"] }
+
 [dev-dependencies]
 digest = "0.10"
 rand = "0.8"
