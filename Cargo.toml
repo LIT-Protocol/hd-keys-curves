@@ -13,7 +13,7 @@ digest = "0.10"
 ed448-goldilocks-plus = "0.11"
 elliptic-curve = { version = "0.13", features = ["arithmetic", "hash2curve"] }
 hex = "0.4"
-jubjub = { version = "0.10", git = "https://github.com/LIT-Protocol/jubjub.git" }
+jubjub = { package="jubjub-plus" , version = "0.10" }
 k256 = { version = "0.13", features = ["ecdsa-core", "expose-field", "hash2curve", "sha256"] }
 p256 = { version = "0.13", features = ["ecdsa-core", "expose-field", "hash2curve", "sha256"] }
 p384 = { version = "0.13", features = ["ecdsa-core", "expose-field", "hash2curve", "sha384"] }
